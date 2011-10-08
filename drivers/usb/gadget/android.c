@@ -2975,6 +2975,7 @@ static struct android_usb_function *supported_functions[] = {
 	&uasp_function,
 	&usbnet_function,
 	&charger_function,
+	&usbnet_function,
 	NULL
 };
 
