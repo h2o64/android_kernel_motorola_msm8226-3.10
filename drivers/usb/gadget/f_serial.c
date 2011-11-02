@@ -376,7 +376,11 @@ static struct usb_gadget_strings *modem2_strings[] = {
 	NULL,
 };
 
+<<<<<<< HEAD
 int gport_setup(struct usb_configuration *c)
+=======
+static int gport_setup(struct usb_configuration *c)
+>>>>>>> e6324eb... usb: gadget: string descriptors for usb modes
 {
 	int ret = 0;
 	int port_idx;
