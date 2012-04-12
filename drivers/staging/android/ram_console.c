@@ -110,12 +110,8 @@ static int __devinit ram_console_probe(struct platform_device *pdev)
 
 	if (pdata) {
 		bootinfo = kstrdup(pdata->bootinfo, GFP_KERNEL);
-		if (bootinfo) {
-			bootinfo_label_size = snprintf(NULL, 0,
-				bootinfo_label, bi_powerup_reason());
-			bootinfo_size = strlen(bootinfo)
-					 + bootinfo_label_size;
-		}
+		if (bootinfo)
+			bootinfo_size = strlen(bootinfo);
 	}
 
 	ram_console_zone = prz;
@@ -186,7 +182,6 @@ static ssize_t ram_console_read_old(struct file *file, char __user *buf,
 		ret = copy_to_user(buf, str + pos, count);
 		kfree(str);
 		str = NULL;
-<<<<<<< HEAD
 		if (ret)
 			return -EFAULT;
 		goto out;
