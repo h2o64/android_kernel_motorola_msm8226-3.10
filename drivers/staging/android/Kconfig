@@ -70,6 +70,36 @@ config ANDROID_PERSISTENT_RAM
 	select REED_SOLOMON_ENC8
 	select REED_SOLOMON_DEC8
 
+config ANDROID_RAM_CONSOLE
+	bool "Android RAM buffer console"
+	depends on !S390 && !UML && HAVE_MEMBLOCK
+	select ANDROID_PERSISTENT_RAM
+	default n
+
+config ANDROID_PERSISTENT_RAM_EXT_BUF
+	bool "Allow printing to old persistent ram"
+	default n
+	depends on ANDROID_RAM_CONSOLE && ANDROID_PERSISTENT_RAM
+	help
+	  Adding function which can print to old persistent ram. It accepts
+	  similar parameters as printk.
+	  Content printed will be visible in last_kmsg.
+	  If unsure, say N.
+
+config PERSISTENT_TRACER
+	bool "Persistent function tracer"
+	depends on HAVE_FUNCTION_TRACER
+	select FUNCTION_TRACER
+	select ANDROID_PERSISTENT_RAM
+	help
+	  persistent_trace traces function calls into a persistent ram
+	  buffer that can be decoded and dumped after reboot through
+	  /sys/kernel/debug/persistent_trace.  It can be used to
+	  determine what function was last called before a reset or
+	  panic.
+
+	  If unsure, say N.
+
 config ANDROID_TIMED_OUTPUT
 	bool "Timed output class driver"
 	default y
