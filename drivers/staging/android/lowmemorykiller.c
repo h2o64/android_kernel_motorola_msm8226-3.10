@@ -499,10 +499,13 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 
 		lowmem_deathpending_timeout = jiffies + HZ;
 
-		/* For easy parsing, show all zones info even its free & file
-		 * are zero. It will show as the following examples:
+		/* Due to MotoCare parser can't handle unfixed column,
+		 * show all zones info even its free & file are zero.
+		 * it will show as the following examples:
 		 *   0:0:756:1127 0:1:0:0 0:2:0:0
 		 *   0:0:767:322 0:1:152:2364 0:2:0:0
+		 * For easy parsing, show all zones info even its free & file
+		 * are zero. It will show as the following examples:
 		 */
 		for (i = 0; i < MAX_NUMNODES; i++)
 			for (j = 0; j < MAX_NR_ZONES; j++)
