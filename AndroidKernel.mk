@@ -67,6 +67,11 @@ KERNEL_MODULES_OUT := $(TARGET_OUT)/lib/modules
 # relative path from KERNEL_OUT to kernel source directory
 KERNEL_SOURCE_RELATIVE_PATH := ../../../../../../kernel
 
+# Avoid auto-generating .dts files that match QC's pattern
+ifeq ($(TARGET_KERNEL_SELECT_OF_DT),true)
+    KERNEL_USE_OF := "n"
+endif
+
 
 TARGET_PREBUILT_KERNEL := $(TARGET_PREBUILT_INT_KERNEL)
 
