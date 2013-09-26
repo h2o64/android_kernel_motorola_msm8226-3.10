@@ -36,6 +36,7 @@ struct tty_buffer {
 	int size;
 	int commit;
 	int read;
+	int padding;
 	/* Data points here */
 	unsigned long data[0];
 };

@@ -72,6 +72,7 @@ static struct tty_buffer *tty_buffer_alloc(struct tty_port *port, size_t size)
 	p->next = NULL;
 	p->commit = 0;
 	p->read = 0;
+	p->padding = 0;
 	p->char_buf_ptr = (char *)(p->data);
 	p->flag_buf_ptr = (unsigned char *)p->char_buf_ptr + size;
 	port->buf.memory_used += size;
@@ -187,7 +188,7 @@ static struct tty_buffer *tty_buffer_find(struct tty_port *port, size_t size)
 			t->used = 0;
 			t->commit = 0;
 			t->read = 0;
-			port->buf.memory_used += t->size;
+			t->padding = 0;
 			return t;
 		}
 		tbh = &((*tbh)->next);
