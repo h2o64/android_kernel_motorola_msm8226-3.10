@@ -3589,6 +3589,25 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 		sdhci_writel(host, sdhci_caps, CORE_VENDOR_SPEC_CAPABILITIES1);
 	}
 
+	if (mmc_host_uhs(msm_host->mmc)) {
+		sdhci_caps = readl_relaxed(host->ioaddr + SDHCI_CAPABILITIES_1);
+
+		if ((sdhci_caps & SDHCI_SUPPORT_SDR104) &&
+			!(host->mmc->caps & MMC_CAP_UHS_SDR104))
+			sdhci_caps &= ~SDHCI_SUPPORT_SDR104;
+
+		if ((sdhci_caps & SDHCI_SUPPORT_DDR50) &&
+			!(host->mmc->caps & MMC_CAP_UHS_DDR50))
+			sdhci_caps &= ~SDHCI_SUPPORT_DDR50;
+
+		if ((sdhci_caps & SDHCI_SUPPORT_SDR50) &&
+			!(host->mmc->caps & MMC_CAP_UHS_SDR50))
+			sdhci_caps &= ~SDHCI_SUPPORT_SDR50;
+
+		sdhci_caps |= ((host_version & 0xFF) << 24);
+		sdhci_writel(host, sdhci_caps, CORE_VENDOR_SPEC_CAPABILITIES1);
+	}
+
 	host->cpu_dma_latency_us = msm_host->pdata->cpu_dma_latency_us;
 	host->cpu_dma_latency_tbl_sz = msm_host->pdata->cpu_dma_latency_tbl_sz;
 	host->pm_qos_req_dma.type = msm_host->pdata->cpu_affinity_type;
