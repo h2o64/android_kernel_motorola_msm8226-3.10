@@ -836,6 +836,9 @@ int mdss_dsi_cont_splash_on(struct mdss_panel_data *pdata)
 
 	mdss_dsi_ctrl_setup(ctrl_pdata);
 	mdss_dsi_sw_reset(ctrl_pdata, true);
+
+//	if (ctrl_pdata->cont_splash_on)
+//		ctrl_pdata->cont_splash_on(pdata);
 	pr_debug("%s-:End\n", __func__);
 	return ret;
 }

@@ -305,6 +305,7 @@ struct mdss_dsi_ctrl_pdata {
 	void (*switch_mode) (struct mdss_panel_data *pdata, int mode);
 	void (*bl_on_defer)(struct mdss_dsi_ctrl_pdata *ctrl);
 	int (*set_cabc)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
+	int (*cont_splash_on) (struct mdss_panel_data *pdata);
 	struct mdss_panel_data panel_data;
 	struct mdss_panel_config panel_config;
 	unsigned char *ctrl_base;

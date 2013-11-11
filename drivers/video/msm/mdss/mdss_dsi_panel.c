@@ -25,6 +25,7 @@
 #include <linux/msm_mdp.h>
 #include <linux/jiffies.h>
 #include <linux/ktime.h>
+#include <mach/mmi_panel_notifier.h>
 
 #include "mdss_dsi.h"
 #include "mdss_fb.h"
@@ -762,6 +763,12 @@ end:
 	pr_info("%s-. Pwr_mode(0x0A) = 0x%x\n", __func__, pwr_mode);
 	return 0;
 }
+static int mdss_dsi_panel_cont_splash_on(struct mdss_panel_data *pdata)
+{
+	mmi_panel_notify(MMI_PANEL_EVENT_DISPLAY_ON, NULL);
+	//mdss_dsi_panel_esd(pdata);
+	return 0;
+}
 
 static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 {
@@ -796,6 +803,11 @@ end:
 	if (pdata->panel_info.dynamic_cabc_enabled)
 		pdata->panel_info.cabc_mode = CABC_OFF_MODE;
 
+	/* Send display on notification.  This will need to be revisited once
+	   we implement command mode support the way we want, since display
+	   may not be made visible to user until a point later than this */
+	mmi_panel_notify(MMI_PANEL_EVENT_DISPLAY_ON, NULL);
+
 	pr_info("%s-:\n", __func__);
 	return 0;
 }
@@ -817,6 +829,8 @@ static int mdss_dsi_panel_low_power_config(struct mdss_panel_data *pdata,
 
 	pr_debug("%s: ctrl=%p ndx=%d enable=%d\n", __func__, ctrl, ctrl->ndx,
 		enable);
+
+	mmi_panel_notify(MMI_PANEL_EVENT_PRE_DISPLAY_OFF, NULL);
 
 	/* Any panel specific low power commands/config */
 	if (enable)
@@ -2137,6 +2151,7 @@ int mdss_dsi_panel_init(struct device *dev,
 	ctrl_pdata->switch_mode = mdss_dsi_panel_switch_mode;
 	ctrl_pdata->bl_on_defer = mdss_dsi_panel_bl_on_defer_start;
 	ctrl_pdata->set_cabc = mdss_dsi_panel_set_cabc;
+	//ctrl_pdata->cont_splash_on = mdss_dsi_panel_cont_splash_on;
 
 	return 0;
 }
