@@ -2252,6 +2252,8 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 		 * Enable 1.8V Signal Enable in the Host Control2
 		 * register
 		 */
+		pr_warning("%s: Switching to 1.2V signalling voltage "
+						" failed\n", mmc_hostname(host->mmc));
 		ctrl |= SDHCI_CTRL_VDD_180;
 		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
 		if (host->ops->check_power_status)
@@ -2259,6 +2261,9 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 
 		/* Wait for 5ms */
 		usleep_range(5000, 5500);
+
+	if (host->ops->hw_reset)
+			host->ops->hw_reset(host);
 
 		/* 1.8V regulator output should be stable within 5 ms */
 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
@@ -2273,9 +2278,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 		if (host->vqmmc) {
 			ret = regulator_set_voltage(host->vqmmc, 1100000, 1300000);
 			if (ret) {
-				pr_warning("%s: Switching to 1.2V signalling voltage "
-						" failed\n", mmc_hostname(host->mmc));
-				return -EIO;
+			return -EIO;
 			}
 		}
 		return 0;
