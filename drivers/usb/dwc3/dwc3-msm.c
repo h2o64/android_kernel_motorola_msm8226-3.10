@@ -212,6 +212,8 @@ struct dwc3_msm {
 	bool ext_chg_opened;
 	bool ext_chg_active;
 	struct completion ext_chg_wait;
+	unsigned int		hvdcp_chrg_mode;
+	int			hvdcp_chrg_stat;
 	unsigned int scm_dev_id;
 	bool suspend_resume_no_support;
 
@@ -1439,6 +1441,8 @@ static void dwc3_start_chg_det(struct dwc3_charger *charger, bool start)
 		cancel_delayed_work_sync(&mdwc->chg_work);
 		mdwc->chg_state = USB_CHG_STATE_UNDEFINED;
 		charger->chg_type = DWC3_INVALID_CHARGER;
+		mdwc->hvdcp_chrg_mode = USB_REQUEST_MODE_NONE;
+		mdwc->hvdcp_chrg_stat = USB_REQUEST_STAT_PENDING;
 		return;
 	}
 
@@ -2213,6 +2217,32 @@ static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = get_prop_usbin_voltage_now(mdwc);
 		break;
+	case POWER_SUPPLY_PROP_POWER_NOW:
+		if (mdwc->hvdcp_chrg_mode == USB_REQUEST_MODE_5V) {
+			if (mdwc->hvdcp_chrg_stat ==
+			    USB_REQUEST_STAT_SUCCESS)
+				val->intval = USB_REQUEST_MODE_5V;
+			else if (mdwc->hvdcp_chrg_stat ==
+				 USB_REQUEST_STAT_FAIL)
+				val->intval = USB_REQUEST_MODE_NONE;
+			else if (mdwc->hvdcp_chrg_stat ==
+				 USB_REQUEST_STAT_PENDING)
+				val->intval = USB_REQUEST_MODE_PENDING;
+		} else if (mdwc->hvdcp_chrg_mode == USB_REQUEST_MODE_9V) {
+			if (mdwc->hvdcp_chrg_stat ==
+			    USB_REQUEST_STAT_SUCCESS)
+				val->intval = USB_REQUEST_MODE_9V;
+			else if (mdwc->hvdcp_chrg_stat ==
+				 USB_REQUEST_STAT_FAIL)
+				val->intval = USB_REQUEST_MODE_NONE;
+			else if (mdwc->hvdcp_chrg_stat ==
+				 USB_REQUEST_STAT_PENDING)
+				val->intval = USB_REQUEST_MODE_PENDING;
+		} else {
+			val->intval = USB_REQUEST_MODE_NONE;
+		}
+
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2368,6 +2398,7 @@ static enum power_supply_property dwc3_msm_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_SCOPE,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_POWER_NOW,
 };
 
 static void dwc3_init_adc_work(struct work_struct *w);
@@ -2637,10 +2668,18 @@ dwc3_msm_ext_chg_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		if (val == USB_REQUEST_5V)
-			pr_debug("%s:voting 5V voltage request\n", __func__);
-		else if (val == USB_REQUEST_9V)
-			pr_debug("%s:voting 9V voltage request\n", __func__);
+		if (val == USB_REQUEST_5V) {
+			pr_info("%s:voting 5V voltage request\n", __func__);
+			mdwc->hvdcp_chrg_mode = USB_REQUEST_MODE_5V;
+			mdwc->hvdcp_chrg_stat = USB_REQUEST_STAT_PENDING;
+		} else if (val == USB_REQUEST_9V) {
+			pr_info("%s:voting 9V voltage request\n", __func__);
+			mdwc->hvdcp_chrg_mode = USB_REQUEST_MODE_9V;
+			mdwc->hvdcp_chrg_stat = USB_REQUEST_STAT_PENDING;
+		}
+
+		power_supply_changed(&mdwc->usb_psy);
+
 		break;
 	case MSM_USB_EXT_CHG_RESULT:
 		if (get_user(val, (int __user *)arg)) {
@@ -2649,10 +2688,16 @@ dwc3_msm_ext_chg_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		if (!val)
-			pr_debug("%s:voltage request successful\n", __func__);
-		else
-			pr_debug("%s:voltage request failed\n", __func__);
+		if (!val) {
+			pr_info("%s:voltage request successful\n", __func__);
+			mdwc->hvdcp_chrg_stat = USB_REQUEST_STAT_SUCCESS;
+		} else {
+			pr_info("%s:voltage request failed\n", __func__);
+			mdwc->hvdcp_chrg_stat = USB_REQUEST_STAT_FAIL;
+		}
+
+		power_supply_changed(&mdwc->usb_psy);
+
 		break;
 	case MSM_USB_EXT_CHG_TYPE:
 		if (get_user(val, (int __user *)arg)) {
@@ -3114,6 +3159,9 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to find dwc3 child\n");
 		goto put_psupply;
 	}
+
+	mdwc->hvdcp_chrg_mode = USB_REQUEST_MODE_NONE;
+	mdwc->hvdcp_chrg_stat = USB_REQUEST_STAT_PENDING;
 
 	host_mode = of_property_read_bool(dwc3_node, "snps,host-only-mode");
 	if (host_mode && of_get_property(pdev->dev.of_node, "vbus_dwc3-supply",
