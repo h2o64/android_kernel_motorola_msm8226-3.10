@@ -130,6 +130,7 @@ struct dwc3_msm_scm_cmd_buf {
 	unsigned int spare;
 };
 
+#define DWC3_ID_STATUS_DELAY        150 /* 150 msec */
 struct dwc3_msm_req_complete {
 	struct list_head list_item;
 	struct usb_request *req;
@@ -174,7 +175,7 @@ struct dwc3_msm {
 	struct delayed_work	chg_work;
 	enum usb_chg_state	chg_state;
 	int			pmic_id_irq;
-	struct work_struct	id_work;
+	struct delayed_work	id_work;
 	struct qpnp_adc_tm_btm_param	adc_param;
 	struct qpnp_adc_tm_chip *adc_tm_dev;
 	struct delayed_work	init_adc_work;
@@ -214,6 +215,7 @@ struct dwc3_msm {
 	struct completion ext_chg_wait;
 	unsigned int		hvdcp_chrg_mode;
 	int			hvdcp_chrg_stat;
+	bool                    defer_read_id;
 	unsigned int scm_dev_id;
 	bool suspend_resume_no_support;
 
@@ -2254,6 +2256,7 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 				  const union power_supply_propval *val)
 {
 	static bool init;
+	unsigned long flags;
 	struct dwc3_msm *mdwc = container_of(psy, struct dwc3_msm,
 								usb_psy);
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
@@ -2299,6 +2302,20 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 				init = true;
 		}
 		mdwc->vbus_active = val->intval;
+		if (mdwc->defer_read_id) {
+			mdwc->defer_read_id = false;
+			local_irq_save(flags);
+			/* Update initial ID state */
+			mdwc->id_state =
+				!!irq_read_line(mdwc->pmic_id_irq);
+			if (mdwc->id_state == DWC3_ID_GROUND &&
+						!mdwc->vbus_active)
+				queue_delayed_work(system_nrt_wq,
+						&mdwc->id_work,
+						msecs_to_jiffies(
+							DWC3_ID_STATUS_DELAY));
+			local_irq_restore(flags);
+		}
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
 		mdwc->online = val->intval;
@@ -2444,9 +2461,11 @@ static void dwc3_ext_notify_online(void *ctx, int on)
 
 static void dwc3_id_work(struct work_struct *w)
 {
-	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm, id_work);
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm, id_work.work);
 	int ret;
 
+	if (mdwc->vbus_active)
+		return;
 	/* Give external client a chance to handle */
 	if (!mdwc->ext_inuse && usb_ext) {
 		if (mdwc->pmic_id_irq)
@@ -2484,7 +2503,10 @@ static irqreturn_t dwc3_pmic_id_irq(int irq, void *data)
 	id = !!irq_read_line(irq);
 	if (mdwc->id_state != id) {
 		mdwc->id_state = id;
-		queue_work(system_nrt_wq, &mdwc->id_work);
+		if (mdwc->vbus_active)
+			return IRQ_HANDLED;
+		queue_delayed_work(system_nrt_wq, &mdwc->id_work,
+				 msecs_to_jiffies(DWC3_ID_STATUS_DELAY));
 	}
 
 	return IRQ_HANDLED;
@@ -2527,7 +2549,7 @@ static void dwc3_adc_notification(enum qpnp_tm_state state, void *ctx)
 		mdwc->adc_param.state_request = ADC_TM_HIGH_THR_ENABLE;
 	}
 
-	dwc3_id_work(&mdwc->id_work);
+	dwc3_id_work(&mdwc->id_work.work);
 
 	/* re-arm ADC interrupt */
 	qpnp_adc_tm_usbid_configure(mdwc->adc_tm_dev, &mdwc->adc_param);
@@ -2811,7 +2833,6 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	struct dwc3	*dwc;
 	struct resource *res;
 	void __iomem *tcsr;
-	unsigned long flags;
 	u32 tmp;
 	bool host_mode;
 	int ret = 0;
@@ -2835,7 +2856,7 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&mdwc->resume_work, dwc3_resume_work);
 	INIT_WORK(&mdwc->restart_usb_work, dwc3_restart_usb_work);
 	INIT_WORK(&mdwc->usb_block_reset_work, dwc3_block_reset_usb_work);
-	INIT_WORK(&mdwc->id_work, dwc3_id_work);
+	INIT_DELAYED_WORK(&mdwc->id_work, dwc3_id_work);
 	INIT_DELAYED_WORK(&mdwc->init_adc_work, dwc3_init_adc_work);
 	init_completion(&mdwc->ext_chg_wait);
 
@@ -3041,6 +3062,8 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 					dev_err(&pdev->dev, "irqreq IDINT failed\n");
 					goto disable_ref_clk;
 				}
+
+				mdwc->defer_read_id = true;
 			}
 		}
 
