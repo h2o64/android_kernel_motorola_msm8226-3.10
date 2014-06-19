@@ -3478,6 +3478,9 @@ static void msm_hs_shutdown(struct uart_port *uport)
 	msm_uport->wakeup.freed = true;
 
 	msm_hs_unconfig_uart_gpios(uport);
+
+	if (wake_lock_active(&msm_uport->rx.wake_lock))
+		wake_unlock(&msm_uport->rx.wake_lock);
 }
 
 static void __exit msm_serial_hs_exit(void)
