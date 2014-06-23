@@ -60,6 +60,10 @@ Optional properties :
   after USB is kept into LPM.
 - qcom,vbus-present: Indicates that there is no VBUS indication from PMIC. Assume VBUS is
   present if this property is defined.
+- pmic-id-gpio: If present, this is the gpio that is used to indicate host_detect
+- pmic-id-amux-chan: If present, this is the AMUX chan when pmic-id-gpio is Analog Input
+- pmic-id-pull: If present, this is the pull value when pmic-id-gpio is Digital Input
+- pmic-id-vin: If present, this is the voltage level when pmic-id-gpio is Digital Input
 Sub nodes:
 - Sub node for "DWC3- USB3 controller".
   This sub node is required property for device node. The properties of this subnode
