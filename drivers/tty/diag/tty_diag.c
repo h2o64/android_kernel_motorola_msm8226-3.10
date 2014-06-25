@@ -71,6 +71,7 @@ static void diag_tty_close(struct tty_struct *tty, struct file *f)
 {
 	struct diag_tty_data *tty_data = tty->driver_data;
 	int disconnect_channel = 1;
+	unsigned long flags;
 	int i;
 	unsigned long flags;
 
@@ -167,6 +168,7 @@ static int diag_tty_write(struct tty_struct *tty,
 	legacy_ch.priv_usb = tty_data;
 
 	spin_unlock_irqrestore(&diag_tty_lock, flags);
+
 	legacy_ch.notify(legacy_ch.priv, USB_DIAG_READ_DONE, d_req_temp);
 
 	return len;
