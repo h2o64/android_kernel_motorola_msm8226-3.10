@@ -2322,6 +2322,9 @@ static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
 		}
 
 		break;
+	case POWER_SUPPLY_PROP_LOW_POWER:
+		val->intval = atomic_read(&mdwc->in_lpm);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2450,6 +2453,18 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 		dev_dbg(mdwc->dev, "%s: charger type: %s\n", __func__,
 				chg_to_string(mdwc->charger.chg_type));
 		break;
+	case POWER_SUPPLY_PROP_LOW_POWER:
+		if (!!val->intval == atomic_read(&mdwc->in_lpm))
+			return 0;
+
+		if (val->intval) {
+			pr_debug("force dwc3 to lpm\n");
+			pm_runtime_put_noidle(mdwc->dev);
+			pm_runtime_mark_last_busy(mdwc->dev);
+			pm_runtime_autosuspend(mdwc->dev);
+		} else {
+			pm_runtime_get_sync(mdwc->dev);
+		}
 	default:
 		return -EINVAL;
 	}
@@ -2491,6 +2506,7 @@ dwc3_msm_property_is_writeable(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_PRESENT:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+	case POWER_SUPPLY_PROP_LOW_POWER:
 		return 1;
 	default:
 		break;
@@ -2513,6 +2529,7 @@ static enum power_supply_property dwc3_msm_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_SCOPE,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_POWER_NOW,
+	POWER_SUPPLY_PROP_LOW_POWER,
 };
 
 static void dwc3_init_adc_work(struct work_struct *w);
