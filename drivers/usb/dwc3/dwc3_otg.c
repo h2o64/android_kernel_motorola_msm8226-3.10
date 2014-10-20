@@ -28,6 +28,7 @@
 
 #define VBUS_REG_CHECK_DELAY	(msecs_to_jiffies(1000))
 #define AUTOSUSP_EN_DELAY   (msecs_to_jiffies(5))
+#define CHG_RECHECK_DELAY      (jiffies + msecs_to_jiffies(2000))
 #define MAX_INVALID_CHRGR_RETRY 3
 static int max_chgr_retry_count = MAX_INVALID_CHRGR_RETRY;
 module_param(max_chgr_retry_count, int, S_IRUGO | S_IWUSR);
@@ -746,6 +747,9 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					dwc3_otg_start_peripheral(&dotg->otg,
 									1);
 					phy->state = OTG_STATE_B_PERIPHERAL;
+					dotg->falsesdp_retry_count = 0;
+					mod_timer(&dotg->chg_check_timer,
+						CHG_RECHECK_DELAY);
 					work = 1;
 					break;
 				case DWC3_FLOATED_CHARGER:
@@ -763,7 +767,8 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					 */
 					if (dotg->charger_retry_count ==
 						max_chgr_retry_count) {
-						dwc3_otg_set_power(phy, 0);
+						dwc3_otg_set_power(phy,
+							DWC3_IDEV_CHG_MIN);
 						dbg_event(0xFF, "FLCHG put", 0);
 						pm_runtime_put_sync(phy->dev);
 						break;
@@ -812,6 +817,8 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 		if (!test_bit(B_SESS_VLD, &dotg->inputs) ||
 				!test_bit(ID, &dotg->inputs)) {
 			dev_dbg(phy->dev, "!id || !bsv\n");
+			del_timer_sync(&dotg->chg_check_timer);
+			dotg->falsesdp_retry_count = 0;
 			dwc3_otg_start_peripheral(&dotg->otg, 0);
 			phy->state = OTG_STATE_B_IDLE;
 			if (charger)
@@ -937,6 +944,28 @@ static void dwc3_otg_reset(struct dwc3_otg *dotg)
 				DWC3_OEVTEN_OTGBDEVVBUSCHNGEVNT);
 }
 
+static void dwc3_otg_chg_check_timer_func(unsigned long data)
+{
+	struct dwc3_otg *dotg = (struct dwc3_otg *) data;
+	struct usb_phy *phy = dotg->otg.phy;
+
+	if (pm_runtime_status_suspended(phy->dev) ||
+		!test_bit(B_SESS_VLD, &dotg->inputs) ||
+		phy->state != OTG_STATE_B_PERIPHERAL ||
+		phy->otg->gadget->speed != USB_SPEED_UNKNOWN) {
+		dev_info(phy->dev, "Nothing to do in chg_check_timer\n");
+		return;
+	}
+
+	if (dotg->falsesdp_retry_count <  max_chgr_retry_count)
+		dotg->falsesdp_retry_count++;
+
+	if (dotg->falsesdp_retry_count == max_chgr_retry_count)
+		dwc3_otg_set_power(phy, DWC3_IDEV_CHG_MIN);
+	else
+		mod_timer(&dotg->chg_check_timer, CHG_RECHECK_DELAY);
+}
+
 /**
  * dwc3_otg_init - Initializes otg related registers
  * @dwc: Pointer to out controller context structure
@@ -1007,6 +1036,8 @@ int dwc3_otg_init(struct dwc3 *dwc)
 	init_completion(&dotg->dwc3_xcvr_vbus_init);
 	INIT_DELAYED_WORK(&dotg->sm_work, dwc3_otg_sm_work);
 	INIT_DELAYED_WORK(&dotg->phy_susp_work, dwc3_otg_phy_susp_work);
+	setup_timer(&dotg->chg_check_timer, dwc3_otg_chg_check_timer_func,
+							(unsigned long) dotg);
 
 	ret = request_irq(dotg->irq, dwc3_otg_interrupt, IRQF_SHARED,
 				"dwc3_otg", dotg);
