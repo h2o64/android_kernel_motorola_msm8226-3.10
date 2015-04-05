@@ -252,6 +252,9 @@ static int boost_mig_sync_thread(void *data)
 		if (kthread_should_stop())
 			break;
 
+		if (ret == -ERESTARTSYS)
+			continue;
+
 		spin_lock_irqsave(&s->lock, flags);
 		s->pending = false;
 		src_cpu = s->src_cpu;
