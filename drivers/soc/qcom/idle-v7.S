@@ -18,6 +18,7 @@
 #include <linux/linkage.h>
 #include <linux/threads.h>
 #include <asm/assembler.h>
+#include <asm/unwind.h>
 
 	.arm
 ENTRY(msm_pm_boot_entry)

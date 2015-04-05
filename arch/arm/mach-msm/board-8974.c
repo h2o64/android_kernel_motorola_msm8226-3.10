@@ -40,7 +40,7 @@
 #include "board-dt.h"
 #include "clock.h"
 #include "platsmp.h"
-
+#include "linux/slimbus/slimbus.h"
 void __init msm_8974_reserve(void)
 {
 	of_scan_flat_dt(dt_scan_for_memory_reserve, NULL);
@@ -74,6 +74,8 @@ static struct of_dev_auxdata msm8974_auxdata_lookup[] __initdata = {
 	OF_DEV_AUXDATA("qcom,usb-bam-msm", 0xF9304000, "usb_bam", NULL),
 	OF_DEV_AUXDATA("qcom,spi-qup-v2", 0xF9924000, \
 			"spi_qsd.1", NULL),
+	OF_DEV_AUXDATA("qcom,spi-qup-v2", 0xF9966000, \
+			"spi_qsd.2", NULL),
 	OF_DEV_AUXDATA("qcom,sdhci-msm", 0xF9824900, \
 			"msm_sdcc.1", NULL),
 	OF_DEV_AUXDATA("qcom,sdhci-msm", 0xF98A4900, \
@@ -97,6 +99,8 @@ static struct of_dev_auxdata msm8974_auxdata_lookup[] __initdata = {
 			"msm_hsic_host", NULL),
 	OF_DEV_AUXDATA("qcom,hsic-smsc-hub", 0, "msm_smsc_hub",
 			msm_hsic_host_adata),
+	OF_DEV_AUXDATA("ti,c55-ctrl", 0x0, \
+			"c55_ctrl", NULL),
 	{}
 };
 
@@ -104,6 +108,19 @@ static void __init msm8974_map_io(void)
 {
 	msm_map_8974_io();
 }
+
+static struct slim_device wm5110_slim_audio = {
+        .name = "wm5110-slim-audio",
+        .e_addr = {0x00, 0x00, 0x10, 0x51, 0x2f, 0x01 },
+};
+
+static struct slim_boardinfo msm_slim_devices[] = {
+        {
+                .bus_num = 1,
+                .slim_slave = &wm5110_slim_audio,
+        },
+};
+
 
 void __init msm8974_init(void)
 {
@@ -122,8 +139,13 @@ void __init msm8974_init(void)
 	if (socinfo_init() < 0)
 		pr_err("%s: socinfo_init() failed\n", __func__);
 
-	msm_8974_init_gpiomux();
+	if (platform_is_msm8974_moto())
+		msm_8974_moto_init_gpiomux();
+	else
+		msm_8974_init_gpiomux();
 	regulator_has_full_constraints();
+	/* Don't use device tree for the wolfson slimbus device */
+	slim_register_board_info(msm_slim_devices, ARRAY_SIZE(msm_slim_devices));
 	msm8974_add_drivers();
 }
 

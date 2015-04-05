@@ -83,20 +83,22 @@ module_param(modem_trigger_panic, uint, S_IRUGO | S_IWUSR);
 
 static void modem_log_rmb_regs(void __iomem *base)
 {
-	pr_err("RMB_MBA_IMAGE: %08x\n", readl_relaxed(base + RMB_MBA_IMAGE));
-	pr_err("RMB_PBL_STATUS: %08x\n", readl_relaxed(base + RMB_PBL_STATUS));
-	pr_err("RMB_MBA_COMMAND: %08x\n",
-				readl_relaxed(base + RMB_MBA_COMMAND));
-	pr_err("RMB_MBA_STATUS: %08x\n", readl_relaxed(base + RMB_MBA_STATUS));
-	pr_err("RMB_PMI_META_DATA: %08x\n",
-				readl_relaxed(base + RMB_PMI_META_DATA));
-	pr_err("RMB_PMI_CODE_START: %08x\n",
-				readl_relaxed(base + RMB_PMI_CODE_START));
-	pr_err("RMB_PMI_CODE_LENGTH: %08x\n",
-				readl_relaxed(base + RMB_PMI_CODE_LENGTH));
-	pr_err("RMB_PROTOCOL_VERSION: %08x\n",
+	pr_alert("RMB_MBA_IMAGE: %08x\n", readl_relaxed(base + RMB_MBA_IMAGE));
+	pr_alert("RMB_PBL_STATUS: %08x\n",
+			readl_relaxed(base + RMB_PBL_STATUS));
+	pr_alert("RMB_MBA_COMMAND: %08x\n",
+			readl_relaxed(base + RMB_MBA_COMMAND));
+	pr_alert("RMB_MBA_STATUS: %08x\n",
+			readl_relaxed(base + RMB_MBA_STATUS));
+	pr_alert("RMB_PMI_META_DATA: %08x\n",
+			readl_relaxed(base + RMB_PMI_META_DATA));
+	pr_alert("RMB_PMI_CODE_START: %08x\n",
+			readl_relaxed(base + RMB_PMI_CODE_START));
+	pr_alert("RMB_PMI_CODE_LENGTH: %08x\n",
+			readl_relaxed(base + RMB_PMI_CODE_LENGTH));
+	pr_alert("RMB_PROTOCOL_VERSION: %08x\n",
 				readl_relaxed(base + RMB_PROTOCOL_VERSION));
-	pr_err("RMB_MBA_DEBUG_INFORMATION: %08x\n",
+	pr_alert("RMB_MBA_DEBUG_INFORMATION: %08x\n",
 			readl_relaxed(base + RMB_MBA_DEBUG_INFORMATION));
 
 	if (modem_trigger_panic == MSS_MAGIC)
@@ -234,11 +236,13 @@ static int pil_msa_wait_for_mba_ready(struct q6v5_data *drv)
 		status != 0, POLL_INTERVAL_US, pbl_mba_boot_timeout_ms * 1000);
 	if (ret) {
 		dev_err(dev, "MBA boot timed out\n");
+		modem_log_rmb_regs(drv->rmb_base);
 		return ret;
 	}
 	if (status != STATUS_XPU_UNLOCKED &&
 	    status != STATUS_XPU_UNLOCKED_SCRIBBLED) {
 		dev_err(dev, "MBA returned unexpected status %d\n", status);
+		modem_log_rmb_regs(drv->rmb_base);
 		return -EINVAL;
 	}
 
@@ -512,9 +516,11 @@ static int pil_msa_auth_modem_mdt(struct pil_desc *pil, const u8 *metadata,
 		POLL_INTERVAL_US, modem_auth_timeout_ms * 1000);
 	if (ret) {
 		dev_err(pil->dev, "MBA authentication of headers timed out\n");
+		modem_log_rmb_regs(drv->rmb_base);
 	} else if (status < 0) {
 		dev_err(pil->dev, "MBA returned error %d for headers\n",
 				status);
+		modem_log_rmb_regs(drv->rmb_base);
 		ret = -EINVAL;
 	}
 
@@ -579,8 +585,10 @@ static int pil_msa_mba_auth(struct pil_desc *pil)
 			50, modem_auth_timeout_ms * 1000);
 	if (ret) {
 		dev_err(pil->dev, "MBA authentication of image timed out\n");
+		modem_log_rmb_regs(drv->rmb_base);
 	} else if (status < 0) {
 		dev_err(pil->dev, "MBA returned error %d for image\n", status);
+		modem_log_rmb_regs(drv->rmb_base);
 		ret = -EINVAL;
 	}
 

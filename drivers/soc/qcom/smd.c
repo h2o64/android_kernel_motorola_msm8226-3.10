@@ -2415,7 +2415,7 @@ static int smsm_init(void)
 	j_start = jiffies;
 	while (!remote_spin_trylock_irqsave(remote_spinlock, flags)) {
 		if (jiffies_to_msecs(jiffies - j_start) > RSPIN_INIT_WAIT_MS) {
-			panic("%s: Remote processor %d will not release spinlock\n",
+			PR_BUG("%s: Remote processor %d will not release spinlock\n",
 				__func__, remote_spin_owner(remote_spinlock));
 		}
 	}
@@ -3049,6 +3049,9 @@ static int restart_notifier_cb(struct notifier_block *this,
 void smd_post_init(unsigned remote_pid)
 {
 	schedule_work(&remote_info[remote_pid].probe_work);
+//	local_bh_disable();
+//	smd_fake_irq_handler(0);
+//	local_bh_enable();
 }
 
 /**

@@ -17,11 +17,14 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 
+#define PR_BUG(m...) do { pr_crit(m); BUG(); } while (0)
+
 struct subsys_device;
 
 enum {
 	RESET_SOC = 0,
 	RESET_SUBSYS_COUPLED,
+	RESET_IGNORE,
 	RESET_LEVEL_MAX
 };
 

@@ -26,12 +26,15 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/types.h>
+#include <linux/io.h>
 
 #include <asm/system_misc.h>
 
 #include <soc/qcom/socinfo.h>
 #include <soc/qcom/smem.h>
 #include <soc/qcom/boot_stats.h>
+
+#include <mach/msm_iomap.h>
 
 #define BUILD_ID_LENGTH 32
 #define SMEM_IMAGE_VERSION_BLOCKS_COUNT 32
@@ -1348,6 +1351,9 @@ const int get_core_count(void)
 
 	if (read_cpuid_mpidr() & BIT(30))
 		return 1;
+
+	if ((read_cpuid_id() & 0xFF0FFFF0) == 0x410FC070)
+		return (__raw_readl(MSM_APCS_GCC_BASE + 0x30)) & 0xF;
 
 	/* 1 + the PART[1:0] field of MIDR */
 	return ((read_cpuid_id() >> 4) & 3) + 1;

@@ -20,8 +20,3 @@
 	compatible = "qcom,msm8974-liquid", "qcom,msm8974", "qcom,liquid";
 	qcom,board-id = <9 0>;
 };
-
-&sdhc_1 {
-	pinctrl-0 = <&sdc1_clk_on_16 &sdc1_cmd_on &sdc1_data_on &sdc1_rclk_on>;
-	pinctrl-1 = <&sdc1_clk_off &sdc1_cmd_off &sdc1_data_off &sdc1_rclk_off>;
-};

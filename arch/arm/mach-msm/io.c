@@ -169,6 +169,9 @@ static struct map_desc msm8610_io_desc[] __initdata = {
 	MSM_CHIP_DEVICE(APCS_GCC, MSM8610),
 	MSM_CHIP_DEVICE(TLMM, MSM8610),
 	MSM_CHIP_DEVICE(MPM2_PSHOLD, MSM8610),
+#ifdef CONFIG_DEBUG_MSM8610_UART
+	MSM_DEVICE(DEBUG_UART),
+#endif
 };
 
 void __init msm_map_msm8610_io(void)

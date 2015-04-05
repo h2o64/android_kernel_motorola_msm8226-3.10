@@ -27,6 +27,7 @@
 #include <linux/clk/msm-clock-generic.h>
 #include <linux/of_platform.h>
 #include <linux/pm_opp.h>
+#include <mach/mmi_soc_info.h>
 #include <soc/qcom/clock-local2.h>
 #include <dt-bindings/clock/msm-clocks-a7.h>
 
@@ -392,6 +393,7 @@ static int clock_a7_probe(struct platform_device *pdev)
 		get_speed_bin_b(pdev, &speed_bin, &version);
 	else
 		get_speed_bin(pdev, &speed_bin, &version);
+	mmi_acpu_bin_set(&speed_bin, NULL, &version);
 
 	snprintf(prop_name, ARRAY_SIZE(prop_name),
 			"qcom,speed%d-bin-v%d", speed_bin, version);

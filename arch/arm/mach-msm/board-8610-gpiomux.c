@@ -18,6 +18,12 @@
 #include <mach/gpiomux.h>
 #include <soc/qcom/socinfo.h>
 
+static struct gpiomux_setting gpio_2ma_pull_up = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+
 static struct gpiomux_setting gpio_spi_config = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_6MA,
@@ -168,6 +174,27 @@ static struct gpiomux_setting gpio_int_sus_cfg = {
 
 static struct msm_gpiomux_config msm_gpio_int_configs[] __initdata = {
 	{
+		.gpio = 8,		/* TEMP_ALERT_N */
+		.settings = {
+			[GPIOMUX_ACTIVE]	= &gpio_int_act_cfg,
+			[GPIOMUX_SUSPENDED]	= &gpio_int_sus_cfg,
+		},
+	},
+	{
+		.gpio = 80,
+		.settings = {
+			[GPIOMUX_ACTIVE]	= &gpio_int_act_cfg,
+			[GPIOMUX_SUSPENDED]	= &gpio_int_sus_cfg,
+		},
+	},
+	{
+		.gpio = 81,
+		.settings = {
+			[GPIOMUX_ACTIVE]	= &gpio_int_act_cfg,
+			[GPIOMUX_SUSPENDED]	= &gpio_int_sus_cfg,
+		},
+	},
+	{
 		.gpio = 84,
 		.settings = {
 			[GPIOMUX_ACTIVE]	= &gpio_int_act_cfg,
@@ -199,6 +226,22 @@ static struct msm_gpiomux_config msm_lcd_te_configs[] __initdata = {
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &lcd_te_act_config,
 			[GPIOMUX_SUSPENDED] = &lcd_te_sus_config,
+		},
+	},
+};
+
+static struct gpiomux_setting backlight_reset_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_OUT_HIGH,
+};
+
+static struct msm_gpiomux_config msm_backlight_reset_configs[] __initdata = {
+	{
+		.gpio = 57,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &backlight_reset_cfg,
 		},
 	},
 };
@@ -424,7 +467,7 @@ static struct gpiomux_setting gpio_suspend_config[] = {
 static struct gpiomux_setting cam_settings[] = {
 	{
 		.func = GPIOMUX_FUNC_1, /*active 1*/ /* 0 */
-		.drv = GPIOMUX_DRV_2MA,
+		.drv = GPIOMUX_DRV_6MA,
 		.pull = GPIOMUX_PULL_NONE,
 	},
 
@@ -485,10 +528,10 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 		},
 	},
 	{
-		.gpio = 14, /* CAM_MCLK1 */
+		.gpio = 14, /* CAM_PWR_EN */
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_settings[0],
-			[GPIOMUX_SUSPENDED] = &cam_settings[1],
+			[GPIOMUX_ACTIVE]    = &cam_settings[3],
+			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
 	{
@@ -514,13 +557,6 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 	},
 	{
 		.gpio = 19, /* FLASH_LED_NOW */
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_settings[3],
-			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
-		},
-	},
-	{
-		.gpio = 8, /* CAM1_STANDBY_N */
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &cam_settings[3],
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
@@ -684,6 +720,16 @@ static struct msm_gpiomux_config ice40_spi_usb_configs[] __initdata = {
 	},
 };
 
+static struct msm_gpiomux_config peripheral_configs[] = {
+	{
+		.gpio = 84, /* HS_DET_N */
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &gpio_2ma_pull_up,
+			[GPIOMUX_SUSPENDED] = &gpio_2ma_pull_up,
+		},
+	},
+};
+
 void __init msm8610_init_gpiomux(void)
 {
 	int rc;
@@ -695,6 +741,7 @@ void __init msm8610_init_gpiomux(void)
 	}
 
 	msm_gpiomux_install(msm_blsp_configs, ARRAY_SIZE(msm_blsp_configs));
+	msm_gpiomux_install(peripheral_configs, ARRAY_SIZE(peripheral_configs));
 	if (of_board_is_qrd()) {
 		msm_gpiomux_install(msm_focaltech_configs,
 			ARRAY_SIZE(msm_focaltech_configs));
@@ -710,6 +757,7 @@ void __init msm8610_init_gpiomux(void)
 				ARRAY_SIZE(msm_lcd_te_configs));
 	msm_gpiomux_install(msm_keypad_configs,
 				ARRAY_SIZE(msm_keypad_configs));
+	msm_gpiomux_install(sd_card_det, ARRAY_SIZE(sd_card_det));
 	msm_gpiomux_install(msm_sensor_configs, ARRAY_SIZE(msm_sensor_configs));
 	msm_gpiomux_install(msm_gpio_int_configs,
 			ARRAY_SIZE(msm_gpio_int_configs));

@@ -293,6 +293,7 @@ static struct clk_lookup msm_clocks_rpm_8974[] = {
 
 	CLK_LOOKUP_OF("ref_clk",    cxo_d1_a_pin, "3-000e"),
 	CLK_LOOKUP_OF("ref_clk_rf", cxo_a2_a_pin, "3-000e"),
+	CLK_LOOKUP_OF("adc_mclk",   cxo_d1_pin, "c55_ctrl"),
 };
 
 static struct of_device_id msm_clock_rpm_match_table[] = {

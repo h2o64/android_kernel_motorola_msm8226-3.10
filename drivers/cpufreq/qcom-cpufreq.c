@@ -74,6 +74,7 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 
 	trace_cpu_frequency_switch_start(freqs.old, freqs.new, policy->cpu);
 
+	if (cpu_clk[policy->cpu]) {
 	rate = new_freq * 1000;
 	rate = clk_round_rate(cpu_clk[policy->cpu], rate);
 	ret = clk_set_rate(cpu_clk[policy->cpu], rate);
@@ -81,7 +82,7 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 		cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 		trace_cpu_frequency_switch_end(policy->cpu);
 	}
-
+	}
 	/* Restore priority after clock ramp-up */
 	if (freqs.new > freqs.old && saved_sched_policy >= 0) {
 		param.sched_priority = saved_sched_rt_prio;
@@ -135,7 +136,13 @@ static int msm_cpufreq_verify(struct cpufreq_policy *policy)
 
 static unsigned int msm_cpufreq_get_freq(unsigned int cpu)
 {
-	return clk_get_rate(cpu_clk[cpu]) / 1000;
+	if (is_clk) {
+		if (cpu_clk[cpu])
+			return clk_get_rate(cpu_clk[cpu]) / 1000;
+		else if (is_sync)
+			return clk_get_rate(cpu_clk[0]) / 1000;
+	}
+
 }
 
 static int msm_cpufreq_init(struct cpufreq_policy *policy)
@@ -160,7 +167,7 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 	if (cpufreq_frequency_table_cpuinfo(policy, table))
 		pr_err("cpufreq: failed to get policy min/max\n");
 
-	cur_freq = clk_get_rate(cpu_clk[policy->cpu])/1000;
+	cur_freq = msm_cpufreq_get_freq(policy->cpu);
 
 	if (cpufreq_frequency_table_target(policy, table, cur_freq,
 	    CPUFREQ_RELATION_H, &index) &&

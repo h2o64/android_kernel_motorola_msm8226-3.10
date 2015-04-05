@@ -447,6 +447,7 @@
 
 &dsi_nt35590_720_vid {
 	qcom,cont-splash-enabled;
+	qcom,splash-no-solid-fill;
 };
 
 &dsi_nt35590_720_cmd {

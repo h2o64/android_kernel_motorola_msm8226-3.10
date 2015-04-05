@@ -16,7 +16,7 @@
 	memory {
 		secure_mem: secure_region@0 {
 			linux,reserve-contiguous-region;
-			reg = <0 0x6D00000>;
+			reg = <0 0x3800000>
 			label = "secure_mem";
 		};
 

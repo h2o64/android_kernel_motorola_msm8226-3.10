@@ -288,3 +288,8 @@ config SUSPEND_TIME
 	  Prints the time spent in suspend in the kernel log, and
 	  keeps statistics on the time spent in suspend in
 	  /sys/kernel/debug/suspend_time
+
+config PM_DEBUG_WAKEUP
+	depends on PM_DEBUG
+	default n
+	bool "Report wakeup source in a uevent"

@@ -37,6 +37,7 @@ config ARCH_MSM8974
 	select MSM_IRQ
 	select PINCTRL
 	select PINCTRL_MSM_TLMM
+	select HAS_MACH_MEMUTILS
 
 config ARCH_APQ8084
 	bool "APQ8084"
@@ -347,6 +348,7 @@ config ARCH_MSM8226
 	select PINCTRL_MSM_TLMM
 	select ENABLE_VMALLOC_SAVINGS
 	select MSM_IRQ
+	select HAS_MACH_MEMUTILS
 endmenu
 
 config MSM_KRAIT_TBB_ABORT_HANDLER
@@ -540,6 +542,15 @@ choice
 		help
 		  Say Y here if you want the debug print routines to direct
 		  their output to the serial port on MSM 8226 devices.
+	
+	config DEBUG_MSM8610_UART
+		bool "Kernel low-level debugging messages via MSM 8610 UART"
+		depends on ARCH_MSM8610
+		select MSM_HAS_DEBUG_UART_HS_V14
+		help
+		  Say Y here if you want the debug print routines to direct
+		  their output to the serial port on MSM 8610 devices.
+	
 
 	config DEBUG_MSMZIRC_UART
 		bool "Kernel low-level debugging messages via MSM ZIRC UART"
@@ -548,6 +559,7 @@ choice
 		help
 		  Say Y here if you want the debug print routines to direct
 		  their output to the serial port on MSM ZIRC devices.
+
 	config DEBUG_MDMFERRUM_UART
 		bool "Kernel low-level debugging messages via MDM FERRUM UART"
 		depends on ARCH_MDMFERRUM
@@ -1029,6 +1041,85 @@ config KRAIT_REGULATOR
 	 line from the PMIC. This supply line is powered by multiple
 	 regulators running in ganged mode inside the PMIC. Enable
 	 this option to support such configurations.
+
+config HAS_MACH_MEMUTILS
+	default n
+	bool "Motorola MSM memcpy enhancements"
+	help
+	Faster memcpy performance for Krait
+
+config MMI_RAM_INFO
+	depends on ARCH_MSM
+	default n
+	bool "Motorola Mobility RAM Info"
+	help
+	Provide mechanism to access RAM size and MR registers values via sysfs.
+
+config MMI_UNIT_INFO
+	depends on ARCH_MSM
+	default n
+	bool "Motorola Mobility Unit Info"
+	help
+	Provide mechanism to expose unit information to other cpu via smem.
+
+config MMI_SOC_INFO
+	depends on ARCH_MSM
+	default n
+	bool "Motorola Mobility SOC Info"
+	help
+	Provide mechanism to annotate SOC info to panic data.
+
+config MMI_DEVICE_DTBS
+	depends on ARCH_MSM
+	default n
+	bool "Motorola Mobility Device DTBs"
+	help
+	  Only include Motorola device specific DTBs to limit the number that
+	  get built during kernel compilation.
+
+config MMI_TITAN_DTB
+	depends on ARCH_MSM8226
+	default n
+	bool "Motorola Titan Device DTBs"
+	help
+	  Only include Motorola Titan specific DTBs to limit the number that
+	  get built during kernel compilation.
+
+	  Titan is a Motorola device that uses MSM8226 chipset, which uses the
+	  MSM8226 defconfig.  Due to its many revisions, adding all of the device
+	  trees will consume at least 1MB of space.
+
+	  If unsure, say 'n'.
+
+config MMI_PEREGRINE_DTB
+	depends on ARCH_MSM8226
+	default n
+	bool "Motorola Peregrine Device DTBs"
+	help
+	  Only include Motorola Peregrine specific DTBs to limit the number that
+	  get built during kernel compilation.
+
+	  Peregrine is a Motorola device that uses MSM8926 chipset, which uses the
+	  MSM8226 defconfig.  Due to its many revisions, adding all of the device
+	  trees will consume at least 1MB of space.
+
+	  If unsure, say 'n'.
+
+config MMI_MSM_PINMUX
+	depends on ARCH_MSM
+	default n
+	bool "Motorola Mobility MSM OF DTS Pinmux Driver"
+	help
+	  Provides capability for reading an OF DT node to provide initial
+	  configuration of GPIO MUX settings on MSM chip families.
+
+config MMI_MSM_CLOCK
+	depends on ARCH_MSM
+	default n
+	bool "Motorola Mobility MSM OF DTS Clock Driver"
+	help
+	  Provides capability for reading an OF DT node to override Clock
+	  specific to MMI product on MSM chip families.
 
 config MSM_PP2S_FEMTO
 	bool "FSM99XX PP2S Interrupt Notification"
