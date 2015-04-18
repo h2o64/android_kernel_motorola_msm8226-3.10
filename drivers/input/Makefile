@@ -29,3 +29,4 @@ obj-$(CONFIG_INPUT_KEYRESET)	+= keyreset.o
 obj-$(CONFIG_INPUT_KEYCOMBO)	+= keycombo.o
 obj-$(CONFIG_HALL_SENSOR)	+= hall_sensor.o
 
+obj-$(CONFIG_INPUT_MOT_VIRTUAL_TOUCHPAD) += aev.o evfwd.o

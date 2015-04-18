@@ -32,6 +32,7 @@
 #define ACCEL_INPUT_DEV_NAME	"accelerometer"
 #define DEVICE_NAME		"kxtj9"
 
+#define START_UP_DEF    21
 #define G_MAX			8000
 /* OUTPUT REGISTERS */
 #define XOUT_L			0x06
@@ -97,16 +98,17 @@ static struct sensors_classdev sensors_cdev = {
 };
 
 static const struct {
+	unsigned int start_up;
 	unsigned int cutoff;
 	u8 mask;
 } kxtj9_odr_table[] = {
-	{ 3,	ODR800F },
-	{ 5,	ODR400F },
-	{ 10,	ODR200F },
-	{ 20,	ODR100F },
-	{ 40,	ODR50F  },
-	{ 80,	ODR25F  },
-	{ 0,	ODR12_5F},
+	{ 3,    3,  ODR800F },
+	{ 4,    5,  ODR400F },
+	{ 6,   10,  ODR200F },
+	{ 11,  20,  ODR100F },
+	{ 21,  40,  ODR50F  },
+	{ 41,  80,  ODR25F  },
+	{ 80,   0,  ODR12_5F},
 };
 
 struct kxtj9_data {
@@ -117,6 +119,7 @@ struct kxtj9_data {
 	struct input_polled_dev *poll_dev;
 #endif
 	unsigned int last_poll_interval;
+	unsigned int start_up_time;
 	bool	enable;
 	u8 shift;
 	u8 ctrl_reg1;
@@ -225,6 +228,7 @@ static int kxtj9_update_odr(struct kxtj9_data *tj9, unsigned int poll_interval)
 	/* Use the lowest ODR that can support the requested poll interval */
 	for (i = 0; i < ARRAY_SIZE(kxtj9_odr_table); i++) {
 		tj9->data_ctrl = kxtj9_odr_table[i].mask;
+		tj9->start_up_time = kxtj9_odr_table[i].start_up;
 		if (poll_interval < kxtj9_odr_table[i].cutoff)
 			break;
 	}
@@ -240,6 +244,9 @@ static int kxtj9_update_odr(struct kxtj9_data *tj9, unsigned int poll_interval)
 	err = i2c_smbus_write_byte_data(tj9->client, CTRL_REG1, tj9->ctrl_reg1);
 	if (err < 0)
 		return err;
+
+	if (tj9->ctrl_reg1 & PC1_ON)
+		msleep(tj9->start_up_time);
 
 	return 0;
 }
@@ -421,9 +428,6 @@ static int kxtj9_enable(struct kxtj9_data *tj9)
 
 	/* turn on outputs */
 	tj9->ctrl_reg1 |= PC1_ON;
-	err = i2c_smbus_write_byte_data(tj9->client, CTRL_REG1, tj9->ctrl_reg1);
-	if (err < 0)
-		return err;
 
 	err = kxtj9_update_odr(tj9, tj9->last_poll_interval);
 	if (err < 0)
@@ -722,8 +726,9 @@ static int kxtj9_verify(struct kxtj9_data *tj9)
 		goto out;
 	}
 
-	retval = (retval != 0x05 && retval != 0x07 && retval != 0x08)
-			? -EIO : 0;
+	retval = (retval != 0x05 && retval != 0x07 &&
+				retval != 0x08 && retval != 0x09)
+		? -EIO : 0;
 
 out:
 	return retval;
@@ -886,6 +891,7 @@ static int kxtj9_probe(struct i2c_client *client,
 
 	tj9->ctrl_reg1 = tj9->pdata.res_ctl | tj9->pdata.g_range;
 	tj9->last_poll_interval = tj9->pdata.init_interval;
+	tj9->start_up_time = START_UP_DEF;
 
 	tj9->cdev = sensors_cdev;
 	/* The min_delay is used by userspace and the unit is microsecond. */

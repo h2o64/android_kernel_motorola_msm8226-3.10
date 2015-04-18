@@ -132,6 +132,12 @@ enum {
 	I2C_CLK_FORCED_LOW_STATE	= 5,
 };
 
+static struct gpiomux_setting recovery_config = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_DOWN,
+};
+
 enum msm_i2c_state {
 	MSM_I2C_PM_ACTIVE,
 	MSM_I2C_PM_SUSPENDED,
@@ -167,6 +173,7 @@ struct qup_i2c_clk_path_vote {
 	bool                        reg_err;
 };
 
+#define RECOVER_FAILED_PANIC_COUNT	100
 struct qup_i2c_dev {
 	struct device                *dev;
 	void __iomem                 *base;		/* virtual */
@@ -198,6 +205,7 @@ struct qup_i2c_dev {
 	void                         *complete;
 	int                          i2c_gpios[ARRAY_SIZE(i2c_rsrcs)];
 	struct qup_i2c_clk_path_vote clk_path_vote;
+	unsigned int                 recover_failed_count;
 };
 
 #ifdef CONFIG_PM
@@ -229,12 +237,6 @@ qup_i2c_interrupt(int irq, void *devid)
 	uint32_t status = 0;
 	uint32_t status1 = 0;
 	uint32_t op_flgs = 0;
-	int err = 0;
-
-	if (atomic_read(&dev->xfer_progress) != 1) {
-		dev_err(dev->dev, "irq:%d when PM suspended\n", irq);
-		return IRQ_NONE;
-	}
 
 	status = readl_relaxed(dev->base + QUP_I2C_STATUS);
 	status1 = readl_relaxed(dev->base + QUP_ERROR_FLAGS);
@@ -253,7 +255,7 @@ qup_i2c_interrupt(int irq, void *devid)
 	if (status & I2C_STATUS_ERROR_MASK) {
 		dev_err(dev->dev, "QUP: I2C status flags :0x%x, irq:%d\n",
 			status, irq);
-		err = status;
+		dev->err = status;
 		/* Clear Error interrupt if it's a level triggered interrupt*/
 		if (dev->num_irqs == 1) {
 			writel_relaxed(QUP_RESET_STATE, dev->base+QUP_STATE);
@@ -265,7 +267,7 @@ qup_i2c_interrupt(int irq, void *devid)
 
 	if (status1 & 0x7F) {
 		dev_err(dev->dev, "QUP: QUP status flags :0x%x\n", status1);
-		err = -status1;
+		dev->err = -status1;
 		/* Clear Error interrupt if it's a level triggered interrupt*/
 		if (dev->num_irqs == 1) {
 			writel_relaxed((status1 & QUP_STATUS_ERROR_FLAGS),
@@ -303,7 +305,6 @@ intr_done:
 	dev_dbg(dev->dev, "QUP intr= %d, i2c status=0x%x, qup status = 0x%x\n",
 			irq, status, status1);
 	qup_print_status(dev);
-	dev->err = err;
 	complete(dev->complete);
 	return IRQ_HANDLED;
 }

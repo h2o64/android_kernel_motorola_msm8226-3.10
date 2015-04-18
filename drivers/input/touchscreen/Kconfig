@@ -13,6 +13,34 @@ if INPUT_TOUCHSCREEN
 
 source "drivers/input/touchscreen/synaptics_dsx/Kconfig"
 
+config TOUCHSCREEN_DEBUG
+	bool "debug"
+	default n
+
+config TOUCHSCREEN_SY3400
+	tristate "Synaptics 34xx Touchscreen Driver"
+	depends on I2C
+	help
+	  Say Y here if you have an Synaptics 34xx touchscreen.
+
+	  If unsure, say N.
+
+config TOUCHSCREEN_SY3200
+	tristate "Synaptics 32xx Touchscreen Driver"
+	depends on I2C
+	help
+	  Say Y here if you have an Synaptics 32xx touchscreen.
+
+	  If unsure, say N.
+
+config TOUCHSCREEN_ATMXT
+	tristate "Atmel mXT Touchscreen Driver"
+	depends on I2C
+	help
+	  Say Y here if you have an Atmel mXT touchscreen.
+
+	  If unsure, say N.
+
 config TOUCHSCREEN_88PM860X
 	tristate "Marvell 88PM860x touchscreen"
 	depends on MFD_88PM860X
@@ -88,17 +116,18 @@ config TOUCHSCREEN_AD7879_SPI
 	  To compile this driver as a module, choose M here: the
 	  module will be called ad7879-spi.
 
-config TOUCHSCREEN_ATMEL_MXT
+config TOUCHSCREEN_ATMEL_MXT_MMI
 	tristate "Atmel mXT I2C Touchscreen"
 	depends on I2C
 	help
 	  Say Y here if you have Atmel mXT series I2C touchscreen,
-	  such as AT42QT602240/ATMXT224, connected to your system.
+	  such as mX540S/mX640S, connected to your system.
+	  This driver includes enhancements from MMI.
 
 	  If unsure, say N.
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called atmel_mxt_ts.
+	  module will be called atmel_mxt_ts_mmi.
 
 config TOUCHSCREEN_ATMEL_MAXTOUCH_TS
 	tristate "Atmel Maxtouch Touchscreen Family"
@@ -180,6 +209,23 @@ config TOUCHSCREEN_CYTTSP_SPI
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called cyttsp_spi.
+
+config TOUCHSCREEN_CYTTSP3
+	tristate "Cypress TrueTouch Generation 3 Touchscreen Driver"
+	depends on I2C
+	help
+	  Say Y here if you have a Cypress TrueTouch Generation 3 Touchscreen
+
+	  If unsure, say N.
+
+config TOUCHSCREEN_MELFAS100_TS
+	tristate "Melfas MMS-100 based touchscreens"
+	depends on I2C
+	default n
+	help
+	  Say Y here if you have a Melfas touchscreen controller.
+
+	  If unsure, say N.
 
 config TOUCHSCREEN_DA9034
 	tristate "Touchscreen support for Dialog Semiconductor DA9034"
@@ -1038,7 +1084,22 @@ config TOUCHSCREEN_GT9XX
 
           If unsure, say N.
 
-source "drivers/input/touchscreen/gt9xx/Kconfig"
+config TOUCHSCREEN_TOUCHX_BASE
+        bool "Enable kernel support for predictive touch module"
+        default y
+        help
+          This enables kernel support for the predictive touch module.
+	  If unsure here, say Y.
+
+config TOUCHSCREEN_TOUCHX
+        tristate "Enable predictive touch module"
+        default n
+	depends on TOUCHSCREEN_TOUCHX_BASE
+        help
+          This enables the predictive touch module. If unsure here, say M.
+
+          To compile this driver as a module, choose M here: the
+          module will be called touchx.
 
 config TOUCHSCREEN_BU21150
 	tristate "JDI AFE BU21150"
@@ -1061,5 +1122,7 @@ config INPUT_MT_WRAPPER
 	  Say Y here if you want to enable the driver.
 
 	  If unsure, say N.
+
+source "drivers/input/touchscreen/gt9xx/Kconfig"
 
 endif
