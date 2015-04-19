@@ -2926,12 +2926,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 				break;
 			/* Fall through */
 		case MMC_BLK_ABORT:
-<<<<<<< HEAD
-			if (mmc_blk_reset(md, card->host, type, status) < 0) &&
-					(retry++ < (MMC_BLK_MAX_RETRIES + 1)))
-=======
 			if (mmc_blk_reset(md, card->host, type, status) < 0)
->>>>>>> 82340be... mmc: improve handling of bad removable cards
 				goto cmd_abort;
 			break;
 		case MMC_BLK_DATA_ERR:
@@ -2940,8 +2935,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 			if (reset == 0)
 				break;
 			if (reset < 0 && (reset == -ENODEV ||
-<<<<<<< HEAD
-				mq_rq->packed_cmd != MMC_PACKED_NONE))
+				mmc_packed_cmd(mq_rq->cmd_type)))
 				goto cmd_abort;
 			/* Fall through */
 		case MMC_BLK_BUS_ERR:
@@ -2953,11 +2947,6 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 			    mmc_blk_throttle_back(md, card->host) >= 0)
 				break;
 			/* Fall through */
-=======
-				mmc_packed_cmd(mq_rq->cmd_type)))
-				goto cmd_abort;
-			/* Fall through */
->>>>>>> 82340be... mmc: improve handling of bad removable cards
 		case MMC_BLK_ECC_ERR:
 			if (brq->data.blocks > 1) {
 				/* Redo read one sector at a time */
@@ -2982,9 +2971,6 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 						brq->data.blksz);
 			if (!ret)
 				goto start_new_req;
-			/* Make sure that ECC errors also get a reset */
-			if (mmc_blk_reset(md, card->host, type, status) < 0)
-				goto cmd_abort;
 			break;
 		case MMC_BLK_NOMEDIUM:
 			goto cmd_abort;
