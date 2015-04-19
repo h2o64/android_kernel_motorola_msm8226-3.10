@@ -826,7 +826,7 @@ periph_interrupt(struct spmi_pmic_arb_dev *pmic_arb, u8 apid, bool show)
 		dev_err(pmic_arb->dev,
 		"periph_interrupt(apid:0x%x sid:0x%x pid:0x%x) unknown peripheral\n",
 			apid, sid, pid);
-		/* return IRQ_NONE; */
+		return IRQ_NONE; 
 	}
 
 	status = spmi_pic_acc_en_rd(pmic_arb, sid, pid, apid, "isr");
@@ -1187,13 +1187,6 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
 
 	pmic_arb->allow_wakeup = !of_property_read_bool(pdev->dev.of_node,
 					"qcom,not-wakeup");
-	if (pmic_arb->allow_wakeup) {
-		ret = irq_set_irq_wake(pmic_arb->pic_irq, 1);
-		if (unlikely(ret)) {
-			pr_err("Unable to set wakeup irq, err=%d\n", ret);
-			return -ENODEV;
-		}
-	}
 
 	pmic_arb->max_apid = 0;
 	pmic_arb->min_apid = PMIC_ARB_MAX_PERIPHS - 1;
@@ -1214,13 +1207,6 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
 	pmic_arb->controller.read_cmd = pmic_arb_read_cmd;
 	pmic_arb->controller.write_cmd =  pmic_arb_write_cmd;
 
-	ret = devm_request_irq(&pdev->dev, pmic_arb->pic_irq,
-		pmic_arb_periph_irq, IRQF_TRIGGER_HIGH, pdev->name, pmic_arb);
-	if (ret) {
-		dev_err(&pdev->dev, "request IRQ failed\n");
-		return ret;
-	}
-
 	ret = spmi_add_controller(&pmic_arb->controller);
 	if (ret)
 		goto err_add_controller;
@@ -1237,6 +1223,21 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
 
 	/* Register device(s) from the device tree */
 	of_spmi_register_devices(&pmic_arb->controller);
+
+	ret = devm_request_irq(&pdev->dev, pmic_arb->pic_irq,
+		pmic_arb_periph_irq, IRQF_TRIGGER_HIGH, pdev->name, pmic_arb);
+	if (ret) {
+		dev_err(&pdev->dev, "request IRQ failed\n");
+		goto err_reg_controller;
+	}
+
+	if (pmic_arb->allow_wakeup) {
+		ret = irq_set_irq_wake(pmic_arb->pic_irq, 1);
+		if (unlikely(ret)) {
+			pr_err("Unable to set wakeup irq, err=%d\n", ret);
+			goto err_reg_controller;
+		}
+	}
 
 	/* Add debugfs file for mapping data */
 	if (spmi_dfs_create_file(&pmic_arb->controller, "mapping",

@@ -28,6 +28,7 @@
 #include <linux/printk.h>
 #include <linux/ratelimit.h>
 #include <linux/irqchip/qpnp-int.h>
+#include <linux/power/pm_debug.h>
 
 #include <asm/irq.h>
 
@@ -625,6 +626,7 @@ static int __qpnpint_handle_irq(struct spmi_controller *spmi_ctrl,
 		struct irq_desc *desc;
 		const char *name = "null";
 
+		wakeup_source_pmic_cleanup();
 		desc = irq_to_desc(irq);
 		if (desc == NULL)
 			name = "stray irq";
@@ -633,6 +635,7 @@ static int __qpnpint_handle_irq(struct spmi_controller *spmi_ctrl,
 
 		pr_warn("%d triggered [0x%01x, 0x%02x,0x%01x] %s\n",
 				irq, spec->slave, spec->per, spec->irq, name);
+		wakeup_source_pmic_add_irq(irq);
 	} else {
 		generic_handle_irq(irq);
 	}

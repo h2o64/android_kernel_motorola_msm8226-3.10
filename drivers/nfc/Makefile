@@ -9,4 +9,7 @@ obj-$(CONFIG_NFC_WILINK)	+= nfcwilink.o
 obj-$(CONFIG_NFC_MEI_PHY)	+= mei_phy.o
 obj-$(CONFIG_NFC_QNCI)		+= nfc-nci.o
 
+obj-$(CONFIG_BCM2079X)		+= bcm2079x-i2c.o
+obj-$(CONFIG_PN544)		+= pn544-mot.o
+
 ccflags-$(CONFIG_NFC_DEBUG) := -DDEBUG

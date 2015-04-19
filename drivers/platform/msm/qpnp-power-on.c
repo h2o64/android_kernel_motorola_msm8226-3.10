@@ -15,6 +15,7 @@
 #include <linux/debugfs.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
+#include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/spmi.h>
 #include <linux/delay.h>
@@ -70,6 +71,10 @@
 
 #define QPNP_PON_SEC_UNLOCK			0xA5
 
+/* spared registers for storing extra reset information */
+#define QPNP_PON_EXTRA_RESET_INFO_1(base)	(base + 0x8D)
+#define QPNP_PON_EXTRA_RESET_INFO_2(base)	(base + 0x8E)
+
 #define QPNP_PON_WARM_RESET_TFT			BIT(4)
 
 #define QPNP_PON_RESIN_PULL_UP			BIT(0)
@@ -87,6 +92,7 @@
 #define QPNP_PON_KPDPWR_N_SET			BIT(0)
 #define QPNP_PON_RESIN_N_SET			BIT(1)
 #define QPNP_PON_CBLPWR_N_SET			BIT(2)
+#define QPNP_PON_KPDPWR_BARK_N_SET		BIT(3)
 #define QPNP_PON_RESIN_BARK_N_SET		BIT(4)
 #define QPNP_PON_KPDPWR_RESIN_BARK_N_SET	BIT(5)
 
@@ -147,7 +153,8 @@ struct qpnp_pon {
 	struct qpnp_pon_config *pon_cfg;
 	int num_pon_config;
 	u16 base;
-	struct delayed_work bark_work;
+	struct delayed_work resin_bark_work;
+	struct delayed_work kpdpwr_bark_work;
 	u32 dbc;
 	int pon_trigger_reason;
 	int pon_power_off_reason;
@@ -227,6 +234,41 @@ qpnp_pon_masked_write(struct qpnp_pon *pon, u16 addr, u8 mask, u8 val)
 			"Unable to write to addr=%hx, rc(%d)\n", addr, rc);
 	return rc;
 }
+
+int qpnp_pon_store_extra_reset_info(u16 mask, u16 val)
+{
+	int rc = 0;
+	u16 extra_reset_info_reg;
+	struct qpnp_pon *pon = sys_reset_dev;
+
+	if (!pon)
+		return -ENODEV;
+
+	if (mask & 0xFF) {
+		extra_reset_info_reg = QPNP_PON_EXTRA_RESET_INFO_1(pon->base);
+		rc = qpnp_pon_masked_write(pon, extra_reset_info_reg,
+		    mask & 0xFF, val & 0xFF);
+		if (rc) {
+			pr_err("Failed to store extra reset info to 0x%x\n",
+			    extra_reset_info_reg);
+			return rc;
+		}
+	}
+
+	if (mask & 0xFF00) {
+		extra_reset_info_reg = QPNP_PON_EXTRA_RESET_INFO_2(pon->base);
+		rc = qpnp_pon_masked_write(pon, extra_reset_info_reg,
+		    (mask & 0xFF00) >> 8, (val & 0xFF00) >> 8);
+		if (rc) {
+			pr_err("Failed to store extra reset info to 0x%x\n",
+			    extra_reset_info_reg);
+			return rc;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(qpnp_pon_store_extra_reset_info);
 
 static int qpnp_pon_set_dbc(struct qpnp_pon *pon, u32 delay)
 {
@@ -518,6 +560,8 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	switch (cfg->pon_type) {
 	case PON_KPDPWR:
 		pon_rt_bit = QPNP_PON_KPDPWR_N_SET;
+		pr_info("Report pwrkey %s event\n", pon_rt_bit & pon_rt_sts ?
+			"press" : "release");
 		break;
 	case PON_RESIN:
 		pon_rt_bit = QPNP_PON_RESIN_N_SET;
@@ -564,8 +608,23 @@ static irqreturn_t qpnp_kpdpwr_irq(int irq, void *_pon)
 	return IRQ_HANDLED;
 }
 
+static void kpdpwr_bark_work_func(struct work_struct *work)
+{
+	kernel_restart(NULL);
+}
+
 static irqreturn_t qpnp_kpdpwr_bark_irq(int irq, void *_pon)
 {
+	struct qpnp_pon *pon = _pon;
+
+	disable_irq_nosync(irq);
+
+	/* set HW reset power up reason */
+	qpnp_pon_store_extra_reset_info(RESET_EXTRA_HW_RESET_REASON,
+					RESET_EXTRA_HW_RESET_REASON);
+
+	schedule_delayed_work(&pon->kpdpwr_bark_work, QPNP_KEY_STATUS_DELAY);
+
 	return IRQ_HANDLED;
 }
 
@@ -645,13 +704,13 @@ static irqreturn_t qpnp_pmic_wd_bark_irq(int irq, void *_pon)
 	return IRQ_HANDLED;
 }
 
-static void bark_work_func(struct work_struct *work)
+static void resin_bark_work_func(struct work_struct *work)
 {
 	int rc;
 	u8 pon_rt_sts = 0;
 	struct qpnp_pon_config *cfg;
 	struct qpnp_pon *pon =
-		container_of(work, struct qpnp_pon, bark_work.work);
+		container_of(work, struct qpnp_pon, resin_bark_work.work);
 
 	cfg = qpnp_get_cfg(pon, PON_RESIN);
 	if (!cfg) {
@@ -691,7 +750,8 @@ static void bark_work_func(struct work_struct *work)
 			goto err_return;
 		}
 		/* re-arm the work */
-		schedule_delayed_work(&pon->bark_work, QPNP_KEY_STATUS_DELAY);
+		schedule_delayed_work(&pon->resin_bark_work,
+				      QPNP_KEY_STATUS_DELAY);
 	}
 
 err_return:
@@ -725,7 +785,7 @@ static irqreturn_t qpnp_resin_bark_irq(int irq, void *_pon)
 	input_report_key(pon->pon_input, cfg->key_code, 1);
 	input_sync(pon->pon_input);
 	/* schedule work to check the bark status for key-release */
-	schedule_delayed_work(&pon->bark_work, QPNP_KEY_STATUS_DELAY);
+	schedule_delayed_work(&pon->resin_bark_work, QPNP_KEY_STATUS_DELAY);
 err_exit:
 	return IRQ_HANDLED;
 }
@@ -1439,8 +1499,6 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 	if (sys_reset && sys_reset_dev) {
 		dev_err(&spmi->dev, "qcom,system-reset property can only be specified for one device on the system\n");
 		return -EINVAL;
-	} else if (sys_reset) {
-		sys_reset_dev = pon;
 	}
 
 	pon->spmi = spmi;
@@ -1481,44 +1539,9 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 		return rc;
 	}
 
-	boot_reason = ffs(pon_sts);
+	//boot_reason = ffs(pon_sts)
 
-	index = ffs(pon_sts) - 1;
-	cold_boot = !qpnp_pon_is_warm_reset();
-	if (index >= ARRAY_SIZE(qpnp_pon_reason) || index < 0) {
-		dev_info(&pon->spmi->dev,
-			"PMIC@SID%d Power-on reason: Unknown and '%s' boot\n",
-			pon->spmi->sid, cold_boot ? "cold" : "warm");
-	} else {
-		pon->pon_trigger_reason = index;
-		dev_info(&pon->spmi->dev,
-			"PMIC@SID%d Power-on reason: %s and '%s' boot\n",
-			pon->spmi->sid, qpnp_pon_reason[index],
-			cold_boot ? "cold" : "warm");
-	}
-
-	/* POFF reason */
-	rc = spmi_ext_register_readl(pon->spmi->ctrl, pon->spmi->sid,
-				QPNP_POFF_REASON1(pon->base),
-				buf, 2);
-	if (rc) {
-		dev_err(&pon->spmi->dev, "Unable to read POFF_RESASON regs\n");
-		return rc;
-	}
-	poff_sts = buf[0] | (buf[1] << 8);
-	index = ffs(poff_sts) - 1;
-	if (index >= ARRAY_SIZE(qpnp_poff_reason) || index < 0) {
-		dev_info(&pon->spmi->dev,
-				"PMIC@SID%d: Unknown power-off reason\n",
-				pon->spmi->sid);
-	} else {
-		pon->pon_power_off_reason = index;
-		dev_info(&pon->spmi->dev,
-				"PMIC@SID%d: Power-off reason: %s\n",
-				pon->spmi->sid,
-				qpnp_poff_reason[index]);
-	}
-
+	//Should I keep that ?
 	if (pon->pon_trigger_reason == PON_SMPL ||
 		pon->pon_power_off_reason == QPNP_POFF_REASON_UVLO) {
 		if (of_property_read_bool(spmi->dev.of_node,
@@ -1592,7 +1615,8 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 
 	dev_set_drvdata(&spmi->dev, pon);
 
-	INIT_DELAYED_WORK(&pon->bark_work, bark_work_func);
+	INIT_DELAYED_WORK(&pon->resin_bark_work, resin_bark_work_func);
+	INIT_DELAYED_WORK(&pon->kpdpwr_bark_work, kpdpwr_bark_work_func);
 
 	/* register the PON configurations */
 	rc = qpnp_pon_config_init(pon);
@@ -1601,6 +1625,47 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 			"Unable to intialize PON configurations\n");
 		return rc;
 	}
+
+	/* Only populate sys_reset_dev on success */
+	if (sys_reset)
+		sys_reset_dev = pon;
+
+index = ffs(pon_sts) - 1;
+	cold_boot = !qpnp_pon_is_warm_reset();
+	if (index >= ARRAY_SIZE(qpnp_pon_reason) || index < 0) {
+		dev_info(&pon->spmi->dev,
+			"PMIC@SID%d Power-on reason: Unknown and '%s' boot\n",
+			pon->spmi->sid, cold_boot ? "cold" : "warm");
+	} else {
+		pon->pon_trigger_reason = index;
+		dev_info(&pon->spmi->dev,
+			"PMIC@SID%d Power-on reason: %s and '%s' boot\n",
+			pon->spmi->sid, qpnp_pon_reason[index],
+			cold_boot ? "cold" : "warm");
+	}
+
+	/* POFF reason */
+	rc = spmi_ext_register_readl(pon->spmi->ctrl, pon->spmi->sid,
+				QPNP_POFF_REASON1(pon->base),
+				buf, 2);
+	if (rc) {
+		dev_err(&pon->spmi->dev, "Unable to read POFF_RESASON regs\n");
+		return rc;
+	}
+	poff_sts = buf[0] | (buf[1] << 8);
+	index = ffs(poff_sts) - 1;
+	if (index >= ARRAY_SIZE(qpnp_poff_reason) || index < 0) {
+		dev_info(&pon->spmi->dev,
+				"PMIC@SID%d: Unknown power-off reason\n",
+				pon->spmi->sid);
+	} else {
+		pon->pon_power_off_reason = index;
+		dev_info(&pon->spmi->dev,
+				"PMIC@SID%d: Power-off reason: %s\n",
+				pon->spmi->sid,
+				qpnp_poff_reason[index]);
+	}
+
 
 	rc = of_property_read_u32(pon->spmi->dev.of_node,
 				"qcom,pon-dbc-delay", &delay);
@@ -1631,7 +1696,8 @@ static int qpnp_pon_remove(struct spmi_device *spmi)
 
 	device_remove_file(&spmi->dev, &dev_attr_debounce_us);
 
-	cancel_delayed_work_sync(&pon->bark_work);
+	cancel_delayed_work_sync(&pon->resin_bark_work);
+	cancel_delayed_work_sync(&pon->kpdpwr_bark_work);
 
 	if (pon->pon_input)
 		input_unregister_device(pon->pon_input);

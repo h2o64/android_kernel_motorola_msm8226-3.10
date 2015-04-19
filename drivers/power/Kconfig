@@ -435,6 +435,29 @@ config QPNP_CHARGER
 	  also offers relevant information to userspace via the power supply
 	  framework.
 
+config MMI_QPNP_CHARGER
+	tristate "MMI QPNP Charger driver"
+	depends on SPMI
+	depends on OF_SPMI
+	depends on THERMAL_QPNP_ADC_TM
+	help
+	  Say Y here to build MMI version of QPNP Charger driver,
+          to enable the switch mode battery charger
+	  and boost device which supports USB detection and charging. The driver
+	  also offers relevant information to userspace via the power supply
+	  framework.
+
+config QPNP_CHARGER_FACTORY
+	tristate "QPNP Charger driver - Factory version"
+	depends on SPMI
+	depends on OF_SPMI
+	depends on THERMAL_QPNP_ADC_TM
+	help
+	  Say Y here to enable the switch mode battery charger for factory
+	  support. This is based on the QPNP_CHARGER driver version modified
+	  to add and remove functionality needed when powered up in a factory
+	  environment.
+
 config QPNP_SMBCHARGER
 	tristate "QPNP SMB Charger driver"
 	depends on SPMI
@@ -542,6 +565,15 @@ config MSM_BCL_PERIPHERAL_CTL
 	  Say Y here to enable this BCL PMIC peripheral driver. This driver
 	  provides routines to configure and monitor the BCL
 	  PMIC peripheral.
+
+config MMI_QPNP_BMS
+	tristate "MMI QPNP Battery Monitoring System driver"
+	depends on SPMI
+	depends on MSM_QPNP_INT
+	help
+	  Say Y here to enable support for MMI QPNP chip bms device.
+	  It registers a fuelgauge bms power supply to report
+	  State of Charge.
 
 source "drivers/power/reset/Kconfig"
 
