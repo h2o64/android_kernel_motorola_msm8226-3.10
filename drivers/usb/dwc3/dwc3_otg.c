@@ -1031,7 +1031,6 @@ int dwc3_otg_init(struct dwc3 *dwc)
 	dwc->dotg = dotg;
 	dotg->dwc = dwc;
 	dotg->otg.phy->dev = dwc->dev;
-	dotg->otg.phy->set_phy_autosuspend = dwc3_otg_set_autosuspend;
 
 	init_completion(&dotg->dwc3_xcvr_vbus_init);
 	INIT_DELAYED_WORK(&dotg->sm_work, dwc3_otg_sm_work);
