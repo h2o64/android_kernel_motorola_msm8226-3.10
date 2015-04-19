@@ -769,6 +769,10 @@ static void frmnet_disable(struct usb_function *f)
 
 	usb_ep_disable(dev->notify);
 	dev->notify->driver_data = NULL;
+	usb_ep_disable(dev->port.in);
+	dev->port.in->driver_data = NULL;
+	usb_ep_disable(dev->port.out);
+	dev->port.out->driver_data = NULL;
 
 	atomic_set(&dev->online, 0);
 
@@ -1340,6 +1344,7 @@ static int frmnet_bind_config(struct usb_configuration *c, unsigned portno)
 			return status;
 		}
 		rmnet_string_defs[0].id = status;
+		rmnet_interface_desc.iInterface = status;
 	}
 
 	spin_lock_irqsave(&dev->lock, flags);
