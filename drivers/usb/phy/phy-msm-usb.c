@@ -1807,7 +1807,7 @@ static int msm_otg_notify_chg_type(struct msm_otg *motg)
 		motg->chg_type == USB_ACA_C_CHARGER))
 		charger_type = POWER_SUPPLY_TYPE_USB_ACA;
 	else
-		charger_type = POWER_SUPPLY_TYPE_UNKNOWN;
+		charger_type = POWER_SUPPLY_TYPE_USB;
 
 	if (!psy) {
 		pr_err("No USB power supply registered!\n");
@@ -2251,12 +2251,15 @@ static bool msm_otg_read_pmic_id_state(struct msm_otg *motg)
 	unsigned long flags;
 	int id;
 
-	if (!motg->pdata->pmic_id_irq)
+	if (motg->pdata->id_gnd_gpio)
+		id = gpio_get_value(motg->pdata->id_gnd_gpio) ^
+			motg->pdata->id_gnd_active_high;
+	else if (motg->pdata->pmic_id_irq){
+		local_irq_save(flags);
+		id = irq_read_line(motg->pdata->pmic_id_irq);
+		local_irq_restore(flags);
+	} else
 		return -ENODEV;
-
-	local_irq_save(flags);
-	id = irq_read_line(motg->pdata->pmic_id_irq);
-	local_irq_restore(flags);
 
 	/*
 	 * If we can not read ID line state for some reason, treat
@@ -2406,7 +2409,12 @@ static void msm_otg_chg_check_timer_func(unsigned long data)
 		dev_dbg(otg->phy->dev, "DCP is detected as SDP\n");
 		set_bit(B_FALSE_SDP, &motg->inputs);
 		queue_work(motg->otg_wq, &motg->sm_work);
+		return;
 	}
+	if (motg->charger_retry_count++ < MAX_INVALID_CHRGR_RETRY)
+		mod_timer(&motg->chg_check_timer, CHG_RECHECK_DELAY);
+	else
+		msm_otg_notify_charger(motg, IDEV_CHG_MIN);
 }
 
 static bool msm_chg_aca_detect(struct msm_otg *motg)
@@ -2943,7 +2951,7 @@ static void msm_chg_detect_work(struct work_struct *w)
 		if (motg->chg_type == USB_DCP_CHARGER)
 			ulpi_write(phy, 0x2, 0x85);
 
-		dev_dbg(phy->dev, "chg_type = %s\n",
+		dev_info(phy->dev, "chg_type = %s\n",
 			chg_to_string(motg->chg_type));
 		queue_work(motg->otg_wq, &motg->sm_work);
 		return;
@@ -2993,11 +3001,20 @@ static void msm_otg_init_sm(struct msm_otg *motg)
 			else
 				clear_bit(B_SESS_VLD, &motg->inputs);
 		} else if (pdata->otg_control == OTG_PMIC_CONTROL) {
-			if (pdata->pmic_id_irq) {
-				if (msm_otg_read_pmic_id_state(motg))
+			/* Set ID if SESS_VLD is set */
+			if (test_bit(B_SESS_VLD, &motg->inputs))
+				set_bit(ID, &motg->inputs);
+			else if (pdata->id_gnd_gpio || pdata->pmic_id_irq) {
+				if (msm_otg_read_pmic_id_state(motg) ||
+					(pdata->id_flt_gpio &&
+					!(gpio_get_value(pdata->id_flt_gpio) ^
+					pdata->id_flt_active_high)))
 					set_bit(ID, &motg->inputs);
 				else
 					clear_bit(ID, &motg->inputs);
+			} else
+				/* Fallback */
+				set_bit(ID, &motg->inputs);
 			} else if (motg->ext_id_irq) {
 				if (gpio_get_value(pdata->usb_id_gpio))
 					set_bit(ID, &motg->inputs);
@@ -3150,10 +3167,24 @@ static void msm_otg_sm_work(struct work_struct *w)
 			case USB_CHG_STATE_DETECTED:
 				switch (motg->chg_type) {
 				case USB_DCP_CHARGER:
-					/* fall through */
-				case USB_PROPRIETARY_CHARGER:
+					/* Enable VDP_SRC */
+					ulpi_write(otg->phy, 0x2, 0x85);
+					if (motg->ext_chg_opened) {
+						init_completion(
+							&motg->ext_chg_wait);
+						motg->ext_chg_active = true;
+					}
 					msm_otg_notify_charger(motg,
-							IDEV_CHG_MAX);
+							       IDEV_CHG_DCP);
+					pm_runtime_put_sync(otg->phy->dev);
+					break;
+				case USB_PROPRIETARY_CHARGER:
+					if (ta_charger_detected)
+						msm_otg_notify_charger(motg,
+								IDEV_CHG_TA);
+					else
+						msm_otg_notify_charger(motg,
+								IDEV_CHG_PROP);
 					pm_runtime_put_sync(otg->phy->dev);
 					break;
 				case USB_FLOATED_CHARGER:
@@ -3185,9 +3216,15 @@ static void msm_otg_sm_work(struct work_struct *w)
 						OTG_STATE_B_PERIPHERAL;
 					break;
 				case USB_SDP_CHARGER:
+					if (otg->gadget &&
+						usb_gadget_get_charge_enabled(
+								otg->gadget))
+						msm_otg_notify_charger(motg,
+								IDEV_CHG_MIN);
 					msm_otg_start_peripheral(otg, 1);
 					otg->phy->state =
 						OTG_STATE_B_PERIPHERAL;
+					motg->charger_retry_count = 0;
 					mod_timer(&motg->chg_check_timer,
 							CHG_RECHECK_DELAY);
 					break;
@@ -3210,7 +3247,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 			break;
 		} else {
 			pr_debug("chg_work cancel");
+			ta_charger_detected = false;
 			del_timer_sync(&motg->chg_check_timer);
+			motg->charger_retry_count = 0;
 			clear_bit(B_FALSE_SDP, &motg->inputs);
 			clear_bit(A_BUS_REQ, &motg->inputs);
 			cancel_delayed_work_sync(&motg->chg_work);
@@ -3233,7 +3272,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 			 * switch from ACA to PMIC.  Check ID state
 			 * before entering into low power mode.
 			 */
-			if ((motg->pdata->otg_control == OTG_PMIC_CONTROL) &&
+			if (aca_enabled() && (motg->pdata->otg_control == OTG_PMIC_CONTROL) &&
 					!msm_otg_read_pmic_id_state(motg)) {
 				pr_debug("process missed ID intr\n");
 				clear_bit(ID, &motg->inputs);
@@ -3248,6 +3287,13 @@ static void msm_otg_sm_work(struct work_struct *w)
 			pm_runtime_mark_last_busy(otg->phy->dev);
 			pm_runtime_autosuspend(otg->phy->dev);
 			motg->pm_done = 1;
+			/* Re-enable ID IRQ's if they are masked */
+			if (motg->pdata->pmic_id_irq &&
+				atomic_read(&motg->pmic_id_masked) &&
+				!factory_mode) {
+				enable_irq(motg->pdata->pmic_id_irq);
+				atomic_set(&motg->pmic_id_masked, 0);
+			}
 		}
 		break;
 	case OTG_STATE_B_SRP_INIT:
@@ -3280,7 +3326,8 @@ static void msm_otg_sm_work(struct work_struct *w)
 	case OTG_STATE_B_PERIPHERAL:
 		if (test_bit(B_SESS_VLD, &motg->inputs) &&
 				test_bit(B_FALSE_SDP, &motg->inputs)) {
-			pr_debug("B_FALSE_SDP\n");
+			pr_info("B_FALSE_SDP - Might be a TA Charger\n");
+			ta_charger_detected = true;
 			msm_otg_start_peripheral(otg, 0);
 			motg->chg_type = USB_DCP_CHARGER;
 			clear_bit(B_FALSE_SDP, &motg->inputs);
@@ -3883,6 +3930,8 @@ static void msm_otg_set_vbus_state(int online)
 {
 	struct msm_otg *motg = the_msm_otg;
 	static bool init;
+	
+	dev_info(motg->phy.dev, "Vbus state = %d\n", online);
 
 	if (online) {
 		pr_debug("PMIC: BSV set\n");
@@ -3929,7 +3978,93 @@ out:
 	} else if (!motg->sm_work_pending) {
 		/* process event only if previous one is not pending */
 		queue_work(motg->otg_wq, &motg->sm_work);
+
+	/*
+	* Disable ID IRQ's when not in factory mode when
+	* a Vbus related event is going on.
+	*/
+	if (motg->pdata->pmic_id_irq &&
+		!atomic_read(&motg->pmic_id_masked) &&
+		!factory_mode) {
+		disable_irq(motg->pdata->pmic_id_irq);
+		atomic_set(&motg->pmic_id_masked, 1);
 	}
+}
+
+static int msm_pmic_is_factory_cable(struct msm_otg *motg)
+{
+	int id_gnd = 0;
+	int id_flt = 0;
+
+	if (!(motg->pdata->id_gnd_gpio && motg->pdata->id_flt_gpio))
+		return 0;
+	id_gnd = gpio_get_value(motg->pdata->id_gnd_gpio) ^
+		motg->pdata->id_gnd_active_high;
+	id_flt = gpio_get_value(motg->pdata->id_flt_gpio) ^
+		motg->pdata->id_flt_active_high;
+
+	if (!id_gnd && !id_flt)
+		return 1;
+	return 0;
+}
+
+static bool  msm_pmic_mmi_factory_mode(void)
+{
+	struct device_node *np = of_find_node_by_path("/chosen");
+	bool factory = false;
+
+	if (np)
+		factory = of_property_read_bool(np, "mmi,factory-cable");
+
+	of_node_put(np);
+	return factory;
+}
+
+static int msm_hff_handle_id_transition(struct msm_otg *motg)
+{
+	int id_gnd = msm_otg_read_pmic_id_state(motg);
+	int id_flt = gpio_get_value(motg->pdata->id_flt_gpio) ^
+			motg->pdata->id_flt_active_high;
+
+	pr_debug("PMIC: ID GND %d\n", id_gnd);
+	pr_debug("PMIC: ID FLT %d\n", id_flt);
+
+	if (!id_gnd && !id_flt) {
+		factory_cable = msm_pmic_is_factory_cable(motg);
+		if (factory_cable)
+			pr_info_once("Factory Cable Attached!\n");
+	} else
+		if (factory_cable) {
+			pr_info("Factory Cable Detached!\n");
+			if (factory_kill_gpio &&
+			    !(gpio_get_value(factory_kill_gpio) ^
+			     factory_kill_gpio_active_high)) {
+				factory_cable = 0;
+				pr_info("Factory Kill Disabled!\n");
+			} else {
+				pr_info("2 sec to power off.\n");
+				kernel_power_off();
+				return 0;
+			}
+		}
+
+	if (motg->pdata->mode == USB_OTG &&
+		motg->pdata->otg_control == OTG_PMIC_CONTROL) {
+		if (id_gnd || !id_flt) {
+			if (!test_and_set_bit(ID, &motg->inputs)) {
+				pr_debug("PMIC: ID set\n");
+				return 1;
+			}
+		} else {
+			if (test_and_clear_bit(ID, &motg->inputs)) {
+				pr_debug("PMIC: ID clear\n");
+				set_bit(A_BUS_REQ, &motg->inputs);
+				return 1;
+			}
+		}
+	}
+
+	return 0;
 }
 
 static void msm_id_status_w(struct work_struct *w)
@@ -3938,6 +4073,7 @@ static void msm_id_status_w(struct work_struct *w)
 						id_status_work.work);
 	int work = 0;
 	int id_state = 0;
+	bool is_hff = motg->pdata->id_gnd_gpio && motg->pdata->id_flt_gpio;
 
 	dev_dbg(motg->phy.dev, "ID status_w\n");
 
@@ -3948,7 +4084,14 @@ static void msm_id_status_w(struct work_struct *w)
 	else if (motg->phy_irq)
 		id_state = msm_otg_read_phy_id_state(motg);
 
-	if (id_state) {
+	if (test_bit(B_SESS_VLD, &motg->inputs) && !factory_mode) {
+		pr_err("Id interrupt ignored in B_SESS_VLD\n");
+		return;
+	}
+
+	if (is_hff)
+		work = msm_hff_handle_id_transition(motg);
+	else if (msm_otg_read_pmic_id_state(motg)) {
 		if (!test_and_set_bit(ID, &motg->inputs)) {
 			pr_debug("ID set\n");
 			work = 1;
@@ -3972,19 +4115,24 @@ static void msm_id_status_w(struct work_struct *w)
 
 }
 
-#define MSM_ID_STATUS_DELAY	5 /* 5msec */
+#define MSM_ID_STATUS_DELAY	150 /* 150 msec */
 static irqreturn_t msm_id_irq(int irq, void *data)
 {
 	struct msm_otg *motg = data;
 
 	if (test_bit(MHL, &motg->inputs) ||
 			mhl_det_in_progress) {
-		pr_debug("PMIC: Id interrupt ignored in MHL\n");
+		pr_err("Id interrupt ignored in MHL\n");
+		return IRQ_HANDLED;
+	}
+
+	if (test_bit(B_SESS_VLD, &motg->inputs) && !factory_mode) {
+		pr_debug("Id interrupt ignored in B_SESS_VLD\n");
 		return IRQ_HANDLED;
 	}
 
 	if (!aca_id_turned_on)
-		/*schedule delayed work for 5msec for ID line state to settle*/
+		/*schedule delayed work for ID line state to settle*/
 		queue_delayed_work(motg->otg_wq, &motg->id_status_work,
 				msecs_to_jiffies(MSM_ID_STATUS_DELAY));
 
@@ -4311,6 +4459,9 @@ static int otg_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = otg_get_prop_usbin_voltage_now(motg);
 		break;
+	case POWER_SUPPLY_PROP_LOW_POWER:
+		val->intval = atomic_read(&motg->in_lpm);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -4382,6 +4533,19 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_HEALTH:
 		motg->usbin_health = val->intval;
 		break;
+	case POWER_SUPPLY_PROP_LOW_POWER:
+		if (!!val->intval == atomic_read(&motg->in_lpm))
+			return 0;
+
+		if (val->intval) {
+			pm_runtime_put_noidle(motg->phy.otg->phy->dev);
+			pm_runtime_mark_last_busy(motg->phy.otg->phy->dev);
+			pm_runtime_autosuspend(motg->phy.otg->phy->dev);
+			motg->pm_done = 1;
+		} else {
+			pm_runtime_get_sync(motg->phy.otg->phy->dev);
+		}
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -4399,6 +4563,7 @@ static int otg_power_property_is_writeable_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
+	case POWER_SUPPLY_PROP_LOW_POWER:
 		return 1;
 	default:
 		break;
@@ -4420,6 +4585,7 @@ static enum power_supply_property otg_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_SCOPE,
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_LOW_POWER,
 };
 
 const struct file_operations msm_otg_bus_fops = {
@@ -4882,6 +5048,70 @@ static ssize_t dpdm_pulldown_enable_store(struct device *dev,
 static DEVICE_ATTR(dpdm_pulldown_enable, S_IRUGO | S_IWUSR,
 		dpdm_pulldown_enable_show, dpdm_pulldown_enable_store);
 
+static void msm_otg_get_id_gpio(struct msm_otg_platform_data *pdata,
+			struct platform_device* pdev)
+{
+	int ret;
+	struct device_node *node = pdev->dev.of_node;
+
+	if (!node) {
+		dev_err(&pdev->dev, "No OF DT node found.\n");
+		return;
+	}
+
+	pdata->id_flt_gpio = of_get_named_gpio(node, "otg,id_flt_gpio", 0);
+	if (pdata->id_flt_gpio < 0)
+		pdata->id_flt_gpio = 0;
+	pdata->id_gnd_gpio = of_get_named_gpio(node, "otg,id_gnd_gpio", 0);
+	if (pdata->id_gnd_gpio < 0)
+		pdata->id_gnd_gpio = 0;
+
+	/* For HFF to work, we need uniquely defined id_gnd and id_flt gpios */
+	if (!pdata->id_gnd_gpio ||  !pdata->id_flt_gpio ||
+			pdata->id_gnd_gpio == pdata->id_flt_gpio)
+		return;
+	pdata->id_flt_active_high = of_property_read_bool(node,
+				"id_flt_active_high");
+	pdata->id_gnd_active_high = of_property_read_bool(node,
+				"id_gnd_active_high");
+
+	ret = gpio_request_one(pdata->id_flt_gpio, GPIOF_IN, "id_flt");
+	if (ret)
+		return;
+
+	ret = gpio_export(pdata->id_flt_gpio, 0);
+	if (ret)
+		goto free_flt;
+
+	ret = gpio_export_link(&pdev->dev, "id_flt", pdata->id_flt_gpio);
+	if (ret)
+		goto free_flt;
+
+	ret = gpio_request_one(pdata->id_gnd_gpio, GPIOF_IN, "id_gnd");
+	if (ret)
+		goto free_flt;
+
+	ret = gpio_export(pdata->id_gnd_gpio, 0);
+	if (ret)
+		goto free_gnd;
+
+	ret = gpio_export_link(&pdev->dev, "id_gnd",
+			       pdata->id_gnd_gpio);
+	if (ret)
+		goto free_gnd;
+
+	pdata->pmic_id_irq = gpio_to_irq(pdata->id_gnd_gpio);
+	return;
+
+free_gnd:
+	gpio_free(pdata->id_gnd_gpio);
+	pdata->id_gnd_gpio = 0;
+free_flt:
+	gpio_free(pdata->id_flt_gpio);
+	pdata->id_flt_gpio = 0;
+	return;
+}
+
 struct msm_otg_platform_data *msm_otg_dt_to_pdata(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
@@ -4951,6 +5181,8 @@ struct msm_otg_platform_data *msm_otg_dt_to_pdata(struct platform_device *pdev)
 	pdata->phy_dvdd_always_on = of_property_read_bool(node,
 				"qcom,phy-dvdd-always-on");
 
+	msm_otg_get_id_gpio(pdata, pdev);
+
 	res_gpio = of_get_named_gpio(node, "qcom,hsusb-otg-vddmin-gpio", 0);
 	if (res_gpio < 0)
 		res_gpio = 0;
@@ -4960,6 +5192,31 @@ struct msm_otg_platform_data *msm_otg_dt_to_pdata(struct platform_device *pdev)
 				"qcom,hsusb-otg-rw-during-lpm-workaround");
 
 	return pdata;
+}
+
+static void __init msm_otg_get_factory_kill_gpio(void)
+{
+	struct device_node *n = NULL;
+	int i, gpio_count;
+	struct gpio gpio;
+	enum of_gpio_flags flags;
+
+	n = of_find_compatible_node(n, NULL, "mmi,factory-support-msm8960");
+	if (!n)
+		return;
+	gpio_count = of_gpio_count(n);
+	for (i = 0; i < gpio_count; i++) {
+		gpio.gpio = of_get_gpio_flags(n, i, &flags);
+		gpio.flags = flags;
+		of_property_read_string_index(n, "gpio-names", i, &gpio.label);
+		if (!strcmp(gpio.label, "factory_kill_disable")) {
+			factory_kill_gpio = gpio.gpio;
+			factory_kill_gpio_active_high =
+				!((gpio.flags & 0x2) >> 1);
+			break;
+		}
+	}
+	of_node_put(n);
 }
 
 static int msm_otg_probe(struct platform_device *pdev)
@@ -5554,6 +5811,10 @@ static int msm_otg_probe(struct platform_device *pdev)
 	if (ret)
 		dev_dbg(&pdev->dev, "fail to setup cdev\n");
 
+	factory_mode = msm_pmic_mmi_factory_mode();
+	factory_cable = factory_mode || msm_pmic_is_factory_cable(motg);
+	msm_otg_get_factory_kill_gpio();
+
 	if (pdev->dev.of_node) {
 		ret = msm_otg_setup_devices(pdev, pdata->mode, true);
 		if (ret) {
@@ -5670,6 +5931,7 @@ static int msm_otg_remove(struct platform_device *pdev)
 	cancel_delayed_work_sync(&motg->suspend_work);
 	cancel_work_sync(&motg->sm_work);
 	destroy_workqueue(motg->otg_wq);
+	ta_charger_detected = false;
 
 	pm_runtime_resume(&pdev->dev);
 
@@ -5688,6 +5950,12 @@ static int msm_otg_remove(struct platform_device *pdev)
 	if (motg->pdata->mpm_dpshv_int || motg->pdata->mpm_dmshv_int)
 		device_remove_file(&pdev->dev,
 				&dev_attr_dpdm_pulldown_enable);
+	if ((motg->pdata->id_gnd_gpio) &&
+	    (motg->pdata->id_gnd_gpio != motg->pdata->id_flt_gpio))
+		gpio_free(motg->pdata->id_gnd_gpio);
+	if (motg->pdata->id_flt_gpio)
+		gpio_free(motg->pdata->id_flt_gpio);
+
 	if (motg->pdata->otg_control == OTG_PHY_CONTROL &&
 		motg->pdata->mpm_otgsessvld_int)
 		msm_mpm_enable_pin(motg->pdata->mpm_otgsessvld_int, 0);
