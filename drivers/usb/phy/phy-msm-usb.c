@@ -75,6 +75,7 @@
 #define USB_PHY_VDD_DIG_VOL_MAX	1320000 /* uV */
 
 #define USB_SUSPEND_DELAY_TIME	(500 * HZ/1000) /* 500 msec */
+#define MAX_INVALID_CHRGR_RETRY 3
 
 enum msm_otg_phy_reg_mode {
 	USB_PHY_REG_OFF,
@@ -103,6 +104,10 @@ static struct msm_otg *the_msm_otg;
 static bool debug_aca_enabled;
 static bool debug_bus_voting_enabled;
 static bool mhl_det_in_progress;
+static int factory_kill_gpio;
+static int factory_kill_gpio_active_high;
+static int factory_cable;
+static bool factory_mode;
 
 static struct regulator *hsusb_3p3;
 static struct regulator *hsusb_1p8;
@@ -111,6 +116,7 @@ static struct regulator *vbus_otg;
 static struct regulator *mhl_usb_hs_switch;
 static struct power_supply *psy;
 
+static bool ta_charger_detected;
 static bool aca_id_turned_on;
 static bool legacy_power_supply;
 static inline bool aca_enabled(void)
@@ -1217,6 +1223,7 @@ static int msm_otg_suspend(struct msm_otg *motg)
 	u32 cmd_val;
 	u32 portsc, config2;
 	u32 func_ctrl;
+	u32 retries = 3;
 	int phcd_retry_cnt = 0, ret;
 	unsigned phy_suspend_timeout;
 
@@ -1322,10 +1329,17 @@ phcd_retry:
 		writel_relaxed(portsc | PORTSC_PHCD,
 				USB_PORTSC);
 		while (cnt < phy_suspend_timeout) {
+				if (readl_relaxed(USB_PORTSC) & PORTSC_PHCD)
+					break;
+				udelay(1);
+				cnt++;
+			}
 			if (readl_relaxed(USB_PORTSC) & PORTSC_PHCD)
 				break;
-			udelay(1);
-			cnt++;
+			dev_info(phy->dev, "Retrying PHY suspend\n");
+			if (pdata->disable_reset_on_disconnect)
+				motg->reset_counter = 0;
+			msm_otg_reset(phy);
 		}
 	}
 
