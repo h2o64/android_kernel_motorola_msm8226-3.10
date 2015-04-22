@@ -15,7 +15,6 @@
 #include <linux/sched.h>
 #include <linux/device.h>
 #include <linux/fault-inject.h>
-#include <linux/wakelock.h>
 
 #include <linux/mmc/core.h>
 #include <linux/mmc/pm.h>
@@ -150,6 +149,7 @@ struct mmc_host_ops {
 	int	(*execute_tuning)(struct mmc_host *host, u32 opcode);
 	int	(*select_drive_strength)(struct mmc_host *host,
 					 int host_drv, int card_drv);
+	int	(*tune_drive_strength)(struct mmc_host *host);
 	void	(*hw_reset)(struct mmc_host *host);
 	void	(*card_event)(struct mmc_host *host);
 	unsigned long (*get_max_frequency)(struct mmc_host *host);
@@ -195,6 +195,7 @@ struct mmc_slot {
 	int cd_irq;
 	struct mutex lock;
 	void *handler_priv;
+	int (*get_cd) (struct mmc_host *host);
 };
 
 /**
@@ -238,6 +239,7 @@ struct mmc_host {
 	unsigned int		f_min;
 	unsigned int		f_max;
 	unsigned int		f_init;
+	unsigned int		max_pwrclass;
 	u32			ocr_avail;
 	u32			ocr_avail_sdio;	/* SDIO-specific OCR */
 	u32			ocr_avail_sd;	/* SD-specific OCR */
@@ -333,6 +335,7 @@ struct mmc_host {
 #define MMC_CAP2_HS400		(MMC_CAP2_HS400_1_8V | \
 				 MMC_CAP2_HS400_1_2V)
 #define MMC_CAP2_NONHOTPLUG	(1 << 25)	/*Don't support hotplug*/
+#define MMC_CAP2_MMC_ONLY	(1 << 30)	/* Host can only be attached to an MMC card */
 #define MMC_CAP2_DRIVER_TYPE_4	(1 << 31)	/* Host supports eMMC Driver Type 4 */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
@@ -382,8 +385,8 @@ struct mmc_host {
 	int			claim_cnt;	/* "claim" nesting count */
 
 	struct delayed_work	detect;
-	struct wake_lock	detect_wake_lock;
-	const char		*wlock_name;
+	struct wakeup_source	detect_ws;
+	const char		*detect_ws_name;
 	int			detect_change;	/* card detect flag */
 	struct mmc_slot		slot;
 

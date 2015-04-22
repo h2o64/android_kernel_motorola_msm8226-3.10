@@ -105,6 +105,9 @@ enum msm_usb_phy_type {
 };
 
 #define IDEV_CHG_MAX	1500
+#define IDEV_CHG_DCP    1300
+#define IDEV_CHG_PROP   1200
+#define IDEV_CHG_TA	1100
 #define IDEV_CHG_MIN	500
 #define IUNIT		100
 
@@ -263,6 +266,10 @@ enum usb_ctrl {
  *		applied.
  * @enable_ahb2ahb_bypass: Indicates whether enable AHB2AHB BYPASS
  *		mode with controller in device mode.
+ * @id_flt_gpio: GPIO from external detection IC for ID Float
+ * @id_gnd_gpio: GPIO from external detection IC for ID Gnd
+ * @id_flt_active_high: Active logic for id_flt_gpio
+ * @id_gnd_active_high: Active logic for id_gnd_gpio
  * @bool disable_retention_with_vdd_min: Indicates whether to enable
 		allowing VDDmin without putting PHY into retention.
  * @usb_id_gpio: Gpio used for USB ID detection.
@@ -297,6 +304,10 @@ struct msm_otg_platform_data {
 	bool rw_during_lpm_workaround;
 	bool enable_ahb2ahb_bypass;
 	bool disable_retention_with_vdd_min;
+	int id_flt_gpio;
+	int id_gnd_gpio;
+	bool id_flt_active_high;
+	bool id_gnd_active_high;
 	int usb_id_gpio;
 	bool phy_dvdd_always_on;
 };
@@ -547,6 +558,8 @@ struct msm_otg {
 	int ui_enabled;
 	bool pm_done;
 	struct qpnp_vadc_chip	*vadc_dev;
+	atomic_t pmic_id_masked;
+	u8 charger_retry_count;
 	int ext_id_irq;
 	bool phy_irq_pending;
 	wait_queue_head_t	host_suspend_wait;

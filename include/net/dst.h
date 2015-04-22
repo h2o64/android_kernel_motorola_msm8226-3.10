@@ -80,8 +80,6 @@ struct dst_entry {
 	unsigned short		trailer_len;	/* space to reserve at tail */
 #ifdef CONFIG_IP_ROUTE_CLASSID
 	__u32			tclassid;
-#else
-	__u32			__pad2;
 #endif
 
 	/*

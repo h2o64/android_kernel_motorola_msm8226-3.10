@@ -54,7 +54,8 @@ struct device_node *of_batterydata_get_best_profile(
 #else
 static inline int of_batterydata_read_data(struct device_node *container_node,
 				struct bms_battery_data *batt_data,
-				int batt_id_uv);
+					   int batt_id_uv
+			                   const char *battid_sn);
 {
 	return -ENXIO;
 }

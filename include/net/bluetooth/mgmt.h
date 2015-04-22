@@ -203,6 +203,16 @@ struct mgmt_rp_disconnect {
 	struct mgmt_addr_info addr;
 } __packed;
 
+#define MGMT_ADDR_BREDR			0x00
+#define MGMT_ADDR_LE_PUBLIC		0x01
+#define MGMT_ADDR_LE_RANDOM		0x02
+#define MGMT_ADDR_INVALID		0xff
+
+struct mgmt_addr_info {
+	bdaddr_t bdaddr;
+	__u8 type;
+} __packed;
+
 #define MGMT_OP_GET_CONNECTIONS		0x0015
 #define MGMT_GET_CONNECTIONS_SIZE	0
 struct mgmt_rp_get_connections {
@@ -319,6 +329,17 @@ struct mgmt_cp_stop_discovery {
 	__u8 type;
 } __packed;
 #define MGMT_STOP_DISCOVERY_SIZE	1
+
+#define MGMT_OP_READ_TX_POWER_LEVEL	0x0025
+struct mgmt_cp_read_tx_power_level {
+	bdaddr_t bdaddr;
+	__u8 type;
+} __packed;
+struct mgmt_rp_read_tx_power_level {
+	bdaddr_t bdaddr;
+	__u8 status;
+	__s8 level;
+} __packed;
 
 #define MGMT_OP_CONFIRM_NAME		0x0025
 struct mgmt_cp_confirm_name {

@@ -130,4 +130,6 @@ int adm_store_cal_data(int port_id, int copp_idx, int path, int perf_mode,
 int adm_send_compressed_device_mute(int port_id, int copp_idx, bool mute_on);
 
 int adm_send_compressed_device_latency(int port_id, int copp_idx, int latency);
+
+void adm_set_none_topo_portid(int port_id);
 #endif /* __Q6_ADM_V2_H__ */

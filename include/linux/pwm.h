@@ -32,6 +32,13 @@ int pwm_enable(struct pwm_device *pwm);
  * pwm_disable - stop a PWM output toggling
  */
 void pwm_disable(struct pwm_device *pwm);
+
+/*
+ * pwm_enable_lut_no_ramp - configure LUT on pwm device
+ * but do not start ramping it
+ */
+int pwm_enable_lut_no_ramp(struct pwm_device *);
+
 #else
 static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
 {
@@ -253,6 +260,7 @@ static inline bool pwm_can_sleep(struct pwm_device *pwm)
 {
 	return false;
 }
+
 #endif
 
 struct pwm_lookup {
