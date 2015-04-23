@@ -2259,7 +2259,10 @@ static int dpcm_fe_dai_open(struct snd_pcm_substream *fe_substream)
 			fe->dai_link->name, stream ? "capture" : "playback",
 			ret);
 		mutex_unlock(&fe->card->mutex);
-		return ret;
+		/* If failure is because of no paths, free the memory */
+	if (ret == 0)
+		dpcm_path_put(&list);
+	return ret;
 	}
 
 	/* calculate valid and active FE <-> BE dpcms */

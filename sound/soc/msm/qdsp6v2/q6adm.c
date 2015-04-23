@@ -80,6 +80,8 @@ struct adm_ctl {
 
 	int set_custom_topology;
 	int ec_ref_rx;
+
+	int port_none_topo;
 };
 
 static struct adm_ctl			this_adm;
@@ -1931,6 +1933,11 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 		}
 
 		open.topology_id = topology;
+		if (this_adm.port_none_topo == port_id &&
+				this_adm.port_none_topo != AFE_PORT_INVALID) {
+			open.topology_id = NULL_COPP_TOPOLOGY;
+			pr_debug("set topology none for port 0X%x\n", port_id);
+		}
 
 		open.dev_num_channel = channel_mode & 0x00FF;
 		open.bit_width = bit_width;
@@ -2950,6 +2957,12 @@ end:
 	return ret;
 }
 
+void adm_set_none_topo_portid(int port_id)
+{
+	this_adm.port_none_topo = port_id;
+	pr_debug("%s port_none_topo: 0X%x", __func__, this_adm.port_none_topo);
+}
+
 int adm_wait_timeout(int port_id, int copp_idx, int wait_time)
 {
 	int ret = 0, port_idx;
@@ -3204,6 +3217,7 @@ static int __init adm_init(void)
 	int i = 0, j;
 	this_adm.apr = NULL;
 	this_adm.ec_ref_rx = -1;
+	this_adm.port_none_topo = AFE_PORT_INVALID;
 	atomic_set(&this_adm.matrix_map_stat, 0);
 	init_waitqueue_head(&this_adm.matrix_map_wait);
 	atomic_set(&this_adm.adm_stat, 0);

@@ -1176,8 +1176,15 @@ static int tapan_hph_impedance_get(struct snd_kcontrol *kcontrol,
 	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
 
 	hphr = mc->shift;
+
+	pr_debug("%s: tapan_priv: %p\n", __func__, priv);
+
+#ifndef CONFIG_SND_SOC_TPA6165A2
 	wcd9xxx_mbhc_get_impedance(&priv->mbhc, &zl, &zr);
 	pr_debug("%s: zl %u, zr %u\n", __func__, zl, zr);
+#else
+	zr = zl = 0;
+#endif
 	ucontrol->value.integer.value[0] = hphr ? zr : zl;
 
 	return 0;
@@ -2482,6 +2489,7 @@ static int tapan_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+#ifndef CONFIG_SND_SOC_TPA6165A2
 /* called under codec_resource_lock acquisition */
 static int tapan_enable_mbhc_micbias(struct snd_soc_codec *codec, bool enable,
 				     enum wcd9xxx_micbias_num micb_num)
@@ -2505,6 +2513,7 @@ static int tapan_enable_mbhc_micbias(struct snd_soc_codec *codec, bool enable,
 	pr_debug("%s: leave ret %d\n", __func__, rc);
 	return rc;
 }
+#endif
 
 static void tx_hpf_corner_freq_callback(struct work_struct *work)
 {
@@ -3579,6 +3588,10 @@ static int tapan_volatile(struct snd_soc_codec *ssc, unsigned int reg)
 
 	/* HPH status registers */
 	if (reg == TAPAN_A_RX_HPH_L_STATUS || reg == TAPAN_A_RX_HPH_R_STATUS)
+		return 1;
+
+	/* HPH PA Enable */
+	if (reg == TAPAN_A_RX_HPH_CNP_EN)
 		return 1;
 
 	if (reg == TAPAN_A_MBHC_INSERT_DET_STATUS)
@@ -6165,7 +6178,9 @@ static const struct wcd9xxx_mbhc_intr cdc_intr_ids = {
 static int tapan_post_reset_cb(struct wcd9xxx *wcd9xxx)
 {
 	int ret = 0;
+#ifndef CONFIG_SND_SOC_TPA6165A2
 	int rco_clk_rate;
+#endif
 	struct snd_soc_codec *codec;
 	struct tapan_priv *tapan;
 	int count;
@@ -6213,6 +6228,7 @@ static int tapan_post_reset_cb(struct wcd9xxx *wcd9xxx)
 				TAPAN_A_MICB_2_CTL, 7,
 				false);
 
+#ifndef CONFIG_SND_SOC_TPA6165A2
 	wcd9xxx_mbhc_deinit(&tapan->mbhc);
 
 	if (TAPAN_IS_1_0(wcd9xxx->version))
@@ -6237,6 +6253,7 @@ static int tapan_post_reset_cb(struct wcd9xxx *wcd9xxx)
 	for (count = 0; count < NUM_CODEC_DAIS; count++)
 		tapan->dai[count].bus_down_in_recovery = true;
 
+#endif
 	mutex_unlock(&codec->mutex);
 	return ret;
 }
@@ -6471,6 +6488,7 @@ static int tapan_codec_probe(struct snd_soc_codec *codec)
 		dev_err(codec->dev, "%s hwdep failed %d\n", __func__, ret);
 		goto err_hwdep;
 	}
+#ifndef CONFIG_SND_SOC_TPA6165A2
 	ret = wcd9xxx_mbhc_init(&tapan->mbhc, &tapan->resmgr, codec,
 				tapan_enable_mbhc_micbias,
 				&mbhc_cb, &cdc_intr_ids, rco_clk_rate,
@@ -6480,6 +6498,7 @@ static int tapan_codec_probe(struct snd_soc_codec *codec)
 		pr_err("%s: mbhc init failed %d\n", __func__, ret);
 		return ret;
 	}
+#endif
 
 	tapan->codec = codec;
 	for (i = 0; i < COMPANDER_MAX; i++) {
@@ -6600,8 +6619,10 @@ static int tapan_codec_remove(struct snd_soc_codec *codec)
 
 	tapan_cleanup_irqs(tapan);
 
+#ifndef CONFIG_SND_SOC_TPA6165A2
 	/* cleanup MBHC */
 	wcd9xxx_mbhc_deinit(&tapan->mbhc);
+#endif
 	/* cleanup resmgr */
 	wcd9xxx_resmgr_deinit(&tapan->resmgr);
 
