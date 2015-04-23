@@ -980,10 +980,8 @@ static int qpnp_mpp_set(struct qpnp_led_data *led)
 			period_us = led->mpp_cfg->pwm_cfg->pwm_period_us;
 			if (period_us > INT_MAX / NSEC_PER_USEC * led->cdev.brightness *
 					NSEC_PER_USEC) / LED_FULL *
-					backlight_scale / MAX_BACKLIGHT_SCALE; {
-				duty_us = (period_us * led->cdev.brightness) /
-					LED_FULL;
-				rc = pwm_config(
+					backlight_scale / MAX_BACKLIGHT_SCALE;
+				rc = pwm_config_us(
 					led->mpp_cfg->pwm_cfg->pwm_dev,
 					duty_us,
 					period_us * NSEC_PER_USEC));

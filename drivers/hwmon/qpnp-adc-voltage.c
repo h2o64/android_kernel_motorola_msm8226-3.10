@@ -1472,7 +1472,8 @@ EXPORT_SYMBOL(qpnp_get_vadc);
 int32_t qpnp_vadc_conv_seq_request(struct qpnp_vadc_chip *vadc,
 				enum qpnp_vadc_trigger trigger_channel,
 					enum qpnp_vadc_channels channel,
-					struct qpnp_vadc_result *result)
+					struct qpnp_vadc_result *result,
+					int pmsafe)
 {
 	int rc = 0, scale_type, amux_prescaling, dt_index = 0, calib_type = 0;
 	uint32_t ref_channel, count = 0, local_idx = 0;

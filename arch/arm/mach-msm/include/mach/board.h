@@ -522,6 +522,9 @@ struct msm_mhl_platform_data {
  *       unprepare_disable) is controlled by i2c-transaction's begining and
  *       ending. When false, the clock's state is controlled by runtime-pm
  *       events.
+ * @active_only when set, votes when system active and removes the vote when
+ *       system goes idle (optimises for performance). When unset, voting using
+ *       runtime pm (optimizes for power).
  * @extended_recovery : Bitfield.
  *       Bit 0 will make the driver will try to do extra 1-pulse
  *       bit-banged recovery if the HW-driven 9-clk bus recovery

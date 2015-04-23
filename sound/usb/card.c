@@ -306,7 +306,6 @@ static int snd_usb_create_streams(struct snd_usb_audio *chip, int ctrlif)
 		break;
 	}
 	}
-
 	return 0;
 }
 
@@ -644,8 +643,8 @@ static void snd_usb_audio_disconnect(struct usb_device *dev,
 	 * disconnected.
 	 */
 
-	switch_set_state(usbaudiosdev, ((switch_get_state(usbaudiosdev) == 0) ? 0 :
-							switch_get_state(usbaudiosdev)-1));
+	//switch_set_state(usbaudiosdev, ((switch_get_state(usbaudiosdev) == 0) ? 0 :
+	//						switch_get_state(usbaudiosdev)-1));
 }
 
 /*

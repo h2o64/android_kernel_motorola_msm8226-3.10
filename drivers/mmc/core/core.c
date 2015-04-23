@@ -3908,6 +3908,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 		host->rescan_disable = 1;
 		spin_unlock_irqrestore(&host->lock, flags);
 
+
 		/* Guard against races with the detect wakeup source. */
 		if (!(host->caps & MMC_CAP_NEEDS_POLL) &&
 		    work_busy(&host->detect.work)) {

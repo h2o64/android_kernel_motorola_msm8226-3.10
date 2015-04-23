@@ -486,8 +486,52 @@ static void i2c_qup_clk_path_postponed_register(struct qup_i2c_dev *dev)
 			dev_info(dev->dev,
 				"msm_bus_scale_register_client(mstr-id:%d):0",
 							dev->pdata->master_id);
+<<<<<<< HEAD
+=======
 		}
 	}
+}
+
+static int i2c_qup_gpio_request(struct qup_i2c_dev *dev)
+{
+	int i;
+	int result = 0;
+
+	for (i = 0; i < ARRAY_SIZE(i2c_rsrcs); ++i) {
+		if (dev->i2c_gpios[i] >= 0) {
+			result = gpio_request(dev->i2c_gpios[i], i2c_rsrcs[i]);
+			if (result) {
+				dev_err(dev->dev,
+					"gpio_request for pin %d failed with error %d\n",
+					dev->i2c_gpios[i], result);
+				goto error;
+			}
+>>>>>>> f6933c0... fixes : Fixes all the errors I made
+		}
+	}
+	return 0;
+
+error:
+	for (; --i >= 0;) {
+		if (dev->i2c_gpios[i] >= 0)
+			gpio_free(dev->i2c_gpios[i]);
+	}
+	return result;
+}
+
+static void i2c_qup_gpio_free(struct qup_i2c_dev *dev)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(i2c_rsrcs); ++i) {
+		if (dev->i2c_gpios[i] >= 0)
+			gpio_free(dev->i2c_gpios[i]);
+	}
+}
+
+static const char *i2c_qup_clk_name(struct qup_i2c_dev *dev, struct clk *clk)
+{
+	return (clk == dev->clk) ? "core_clk" : "iface_clk";
 }
 
 static int i2c_qup_gpio_request(struct qup_i2c_dev *dev)
@@ -600,6 +644,9 @@ static void i2c_qup_sys_suspend(struct qup_i2c_dev *dev)
 
 static void i2c_qup_resume(struct qup_i2c_dev *dev)
 {
+	if (dev->pwr_state == MSM_I2C_PM_ACTIVE)
+		return;
+
 	i2c_qup_gpio_request(dev);
 
 	i2c_qup_clk_path_postponed_register(dev);
@@ -974,6 +1021,28 @@ static int qup_i2c_try_recover_bus_busy(struct qup_i2c_dev *dev)
 
 	status = readl_relaxed(dev->base + QUP_I2C_STATUS);
 
+	if (dev->pdata->extended_recovery & 0x1 &&
+					(status & I2C_STATUS_BUS_ACTIVE)) {
+		dev_info(dev->dev,
+		"9 clk pulse bus recovery did not help, try 1 clk pulse\n");
+		qup_i2c_recover_gpio(dev);
+		status = readl_relaxed(dev->base + QUP_I2C_STATUS);
+		dev_info(dev->dev, "Extended Bus recovery %s\n",
+			(status & I2C_STATUS_BUS_ACTIVE) ? "fail" : "success");
+
+		/* Only panic on extended-recovery enabled bus */
+		if (status & I2C_STATUS_BUS_ACTIVE &&
+		    dev->recover_failed_count > RECOVER_FAILED_PANIC_COUNT) {
+			pr_info("BUG: Bus recovery failed trigger panic\n");
+			BUG();
+		}
+	}
+
+	if (status & I2C_STATUS_BUS_ACTIVE)
+		dev->recover_failed_count++;
+	else
+		dev->recover_failed_count = 0;
+
 recovery_end:
 	enable_irq(dev->err_irq);
 	return ret;
@@ -1220,15 +1289,25 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 									HZ);
 					if (timeout)
 						goto timeout_err;
+					/* Try to recover, since either we are
+					 * the master or no one claims to be.
+					 * There may or may not be an I2C error,
+					 * but recovery code will try up to
+					 * RECOVER_FAILED_PANIC_COUNT times
+					 * and then BUG out.
+					 */
+					qup_i2c_recover_bus_busy(dev);
 				}
 				qup_i2c_recover_bus_busy(dev);
 				dev_err(dev->dev,
 					"Transaction timed out, SL-AD = 0x%x\n",
 					dev->msg->addr);
-
-				dev_err(dev->dev, "I2C Status: %x\n", istatus);
-				dev_err(dev->dev, "QUP Status: %x\n", qstatus);
-				dev_err(dev->dev, "OP Flags: %x\n", op_flgs);
+				dev_err(dev->dev, "I2C Status: %x\n",
+						istatus);
+				dev_err(dev->dev, "QUP Status: %x\n",
+						qstatus);
+				dev_err(dev->dev, "OP Flags: %x\n",
+						op_flgs);
 				ret = -ETIMEDOUT;
 				goto out_err;
 			}
@@ -1252,7 +1331,10 @@ timeout_err:
 					 * So you may call recover-bus-busy when
 					 * this error happens
 					 */
-					qup_i2c_recover_bus_busy(dev);
+					if (!(dev->err & I2C_STATUS_BUS_ACTIVE)
+					 || dev->err & I2C_STATUS_BUS_MASTER
+					 || dev->pdata->extended_recovery & 0x2)
+						qup_i2c_recover_bus_busy(dev);
 				}
 				ret = -dev->err;
 				goto out_err;
@@ -1367,6 +1449,8 @@ int msm_i2c_rsrcs_dt_to_pdata_map(struct platform_device *pdev,
 	{"qcom,scl-gpio",      gpios,               DT_OPTIONAL,  DT_GPIO, -1},
 	{"qcom,sda-gpio",      gpios + 1,           DT_OPTIONAL,  DT_GPIO, -1},
 	{"qcom,clk-ctl-xfer", &pdata->clk_ctl_xfer, DT_OPTIONAL,  DT_BOOL, -1},
+	{"qcom,extended-recovery", &pdata->extended_recovery,
+							DT_OPTIONAL, DT_U32, 0},
 	{"qcom,noise-rjct-scl", &pdata->noise_rjct_scl, DT_OPTIONAL, DT_U32, 0},
 	{"qcom,noise-rjct-sda", &pdata->noise_rjct_sda, DT_OPTIONAL, DT_U32, 0},
 	{NULL,                                    NULL,           0,      0, 0},

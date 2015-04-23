@@ -4328,6 +4328,42 @@ static int cgroup_destroy_locked(struct cgroup *cgrp)
 	 */
 	for_each_subsys(cgrp->root, ss) {
 		struct cgroup_subsys_state *css = cgrp->subsys[ss->subsys_id];
+<<<<<<< HEAD
+=======
+		if (failed) {
+			/*
+			 * Restore old refcnt if we previously managed
+			 * to clear it from 1 to 0
+			 */
+			if (!atomic_read(&css->refcnt))
+				atomic_set(&css->refcnt, 1);
+		} else {
+			/* Commit the fact that the CSS is removed */
+			set_bit(CSS_REMOVED, &css->flags);
+		}
+	}
+	local_irq_restore(flags);
+	return !failed;
+}
+
+/* Checks if all of the css_sets attached to a cgroup have a refcount of 0. */
+static int cgroup_css_sets_empty(struct cgroup *cgrp)
+{
+	struct cg_cgroup_link *link;
+	int retval = 1;
+
+	read_lock(&css_set_lock);
+	list_for_each_entry(link, &cgrp->css_sets, cgrp_link_list) {
+		struct css_set *cg = link->cg;
+		if (cg && (atomic_read(&cg->refcount) > 0)) {
+			read_unlock(&css_set_lock);
+			retval = 0;
+			break;
+		}
+	}
+
+	read_unlock(&css_set_lock);
+>>>>>>> f6933c0... fixes : Fixes all the errors I made
 
 		WARN_ON(atomic_read(&css->refcnt) < 0);
 		atomic_add(CSS_DEACT_BIAS, &css->refcnt);

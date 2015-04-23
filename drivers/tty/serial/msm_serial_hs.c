@@ -1157,6 +1157,8 @@ static void msm_hs_set_termios(struct uart_port *uport,
 			ret = wait_event_timeout(msm_uport->rx.wait,
 				msm_uport->rx_bam_inprogress == false,
 				RX_FLUSH_COMPLETE_TIMEOUT);
+		/* make sure rx tasklet finishes */
+		tasklet_kill(&msm_uport->rx.tlet);
 		ret = disconnect_rx_endpoint(msm_uport);
 		if (ret)
 			MSM_HS_ERR("%s(): sps_disconnect failed\n", __func__);
