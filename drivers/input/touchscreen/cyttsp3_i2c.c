@@ -74,7 +74,7 @@ static s32 ttsp_i2c_write_block_data(void *handle, u8 addr,
 	return (retval < 0) ? retval : retval != length+1 ? -EIO : 0;
 }
 
-static int __devinit cyttsp_i2c_probe(struct i2c_client *client,
+static int cyttsp_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
 	struct cyttsp_i2c *ts;
@@ -122,7 +122,7 @@ cyttsp_i2c_probe_exit:
 }
 
 /* registered in driver struct */
-static int __devexit cyttsp_i2c_remove(struct i2c_client *client)
+static int cyttsp_i2c_remove(struct i2c_client *client)
 {
 	struct cyttsp_i2c *ts;
 
@@ -169,7 +169,7 @@ static struct i2c_driver cyttsp_i2c_driver = {
 		.of_match_table = cyttsp_match_table,
 	},
 	.probe = cyttsp_i2c_probe,
-	.remove = __devexit_p(cyttsp_i2c_remove),
+	.remove = _p(cyttsp_i2c_remove),
 	.id_table = cyttsp_i2c_id,
 #if defined(CONFIG_PM) && !defined(CONFIG_HAS_EARLYSUSPEND)
 	.suspend = cyttsp_i2c_suspend,

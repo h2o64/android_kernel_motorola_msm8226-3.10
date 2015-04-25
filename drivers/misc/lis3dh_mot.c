@@ -1047,7 +1047,7 @@ err0:
 	return err;
 }
 
-static int __devexit lis3dh_remove(struct i2c_client *client)
+static int  lis3dh_remove(struct i2c_client *client)
 {
 	struct lis3dh_data *lis = i2c_get_clientdata(client);
 	if (lis->vdd != NULL) {
@@ -1086,7 +1086,7 @@ static struct i2c_driver lis3dh_driver = {
 		.of_match_table = of_match_ptr(lis3dh_match_tbl),
 	},
 	.probe = lis3dh_probe,
-	.remove = __devexit_p(lis3dh_remove),
+	.remove = _p(lis3dh_remove),
 	.id_table = lis3dh_id,
 };
 

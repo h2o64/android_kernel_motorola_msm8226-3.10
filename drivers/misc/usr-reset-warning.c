@@ -54,7 +54,7 @@ static irqreturn_t usr_reset_warning_isr(int irq, void *dev)
 	return IRQ_HANDLED;
 }
 #ifdef CONFIG_OF
-static int __devinit usr_reset_of_init(struct usr_reset_warning_data *data,
+static int  usr_reset_of_init(struct usr_reset_warning_data *data,
 				struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -63,13 +63,13 @@ static int __devinit usr_reset_of_init(struct usr_reset_warning_data *data,
 	return ((data->gpio < 0) ? -EINVAL : 0);
 }
 #else
-static int __devinit usr_reset_of_init(struct usr_reset_warning_data *data,
+static int  usr_reset_of_init(struct usr_reset_warning_data *data,
 				struct platform_device *pdev)
 {
 	return -EINVAL;
 }
 #endif
-static int __devinit usr_reset_warning_probe(struct platform_device *pdev)
+static int  usr_reset_warning_probe(struct platform_device *pdev)
 {
 	struct usr_reset_warning_data *data;
 	int ret = -EINVAL;

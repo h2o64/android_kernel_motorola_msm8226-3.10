@@ -49,8 +49,8 @@ static int sy3400_resume(struct i2c_client *client);
 static void sy3400_early_suspend(struct early_suspend *handler);
 static void sy3400_late_resume(struct early_suspend *handler);
 #endif
-static int __devinit sy3400_init(void);
-static void __devexit sy3400_exit(void);
+static int sy3400_init(void);
+static void sy3400_exit(void);
 static void sy3400_free(struct sy3400_driver_data *dd);
 static void sy3400_free_ic_data(struct sy3400_driver_data *dd);
 static void sy3400_set_drv_state(struct sy3400_driver_data *dd,
@@ -150,7 +150,7 @@ static struct i2c_driver sy3400_driver = {
 		.of_match_table = of_match_ptr(sy3400_match_tbl),
 	},
 	.probe = sy3400_probe,
-	.remove = __devexit_p(sy3400_remove),
+	.remove = _p(sy3400_remove),
 	.id_table = sy3400_id,
 #ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend = sy3400_suspend,
@@ -661,12 +661,12 @@ static void sy3400_late_resume(struct early_suspend *handler)
 }
 #endif
 
-static int __devinit sy3400_init(void)
+static int sy3400_init(void)
 {
 	return i2c_add_driver(&sy3400_driver);
 }
 
-static void __devexit sy3400_exit(void)
+static void sy3400_exit(void)
 {
 	i2c_del_driver(&sy3400_driver);
 	return;

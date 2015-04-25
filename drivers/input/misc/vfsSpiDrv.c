@@ -872,7 +872,7 @@ struct spi_driver vfsspi_spi = {
 		.of_match_table = validity_metallica_table,
 	},
 		.probe  = vfsspi_probe,
-		.remove = __devexit_p(vfsspi_remove),
+		.remove = _p(vfsspi_remove),
 };
 
 static int __init vfsspi_init(void)

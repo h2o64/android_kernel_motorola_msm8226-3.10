@@ -34,7 +34,7 @@ struct persistent_ram_buffer {
 
 #define PERSISTENT_RAM_SIG (0x43474244) /* DBGC */
 
-static __devinitdata LIST_HEAD(persistent_ram_list);
+static LIST_HEAD(persistent_ram_list);
 
 static inline size_t buffer_size(struct persistent_ram_zone *prz)
 {
@@ -377,7 +377,6 @@ void persistent_ram_ext_oldbuf_merge(struct persistent_ram_zone *prz)
 				prz->old_log_size);
 			prz->old_log = old_log2;
 			prz->old_log_size += ext_size;
-			pr_info("persistent_ram: merged ext buf size %zu\n",
 				ext_size);
 		} else {
 			pr_err("persistent_ram: cannot merge ext buf size %zu\n",
@@ -388,8 +387,7 @@ void persistent_ram_ext_oldbuf_merge(struct persistent_ram_zone *prz)
 }
 #endif
 
-static void __devinit
-persistent_ram_save_old(struct persistent_ram_zone *prz)
+static void persistent_ram_save_old(struct persistent_ram_zone *prz)
 {
 	struct persistent_ram_buffer *buffer = prz->buffer;
 	size_t size = buffer_size(prz);
@@ -495,7 +493,7 @@ static int persistent_ram_buffer_map(phys_addr_t start, phys_addr_t size,
 	return 0;
 }
 
-static int __devinit persistent_ram_buffer_init(const char *name,
+static int persistent_ram_buffer_init(const char *name,
 		struct persistent_ram_zone *prz, struct persistent_ram **ramp)
 {
 	int i;
@@ -519,8 +517,7 @@ static int __devinit persistent_ram_buffer_init(const char *name,
 	return -EINVAL;
 }
 
-static  __devinit
-struct persistent_ram_zone *__persistent_ram_init(struct device *dev, bool ecc)
+static struct persistent_ram_zone *__persistent_ram_init(struct device *dev, bool ecc)
 {
 	struct persistent_ram *ram;
 	struct persistent_ram_zone *prz;
@@ -572,13 +569,12 @@ err:
 	return ERR_PTR(ret);
 }
 
-struct persistent_ram_zone * __devinit
-persistent_ram_init_ringbuffer(struct device *dev, bool ecc)
+struct persistent_ram_zone * persistent_ram_init_ringbuffer(struct device *dev, bool ecc)
 {
 	return __persistent_ram_init(dev, ecc);
 }
 
-void __devinit persistent_ram_add(struct persistent_ram *ram)
+void persistent_ram_add(struct persistent_ram *ram)
 {
 	list_add_tail(&ram->node, &persistent_ram_list);
 
@@ -586,7 +582,7 @@ void __devinit persistent_ram_add(struct persistent_ram *ram)
 		(long)ram->start, (long)(ram->start + ram->size - 1));
 }
 
-int __init persistent_ram_early_init(struct persistent_ram *ram)
+int persistent_ram_early_init(struct persistent_ram *ram)
 {
 	int ret;
 

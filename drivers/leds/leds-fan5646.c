@@ -764,7 +764,7 @@ static int fan5646_register_leds(struct device *dev)
 	return 0;
 }
 
-static int __devinit fan5646_of_init(struct device *dev)
+static int  fan5646_of_init(struct device *dev)
 {
 	struct device_node *np, *sp;
 	int rc = 0;
@@ -822,7 +822,7 @@ static int __devinit fan5646_of_init(struct device *dev)
 	return rc;
 }
 
-static int __devinit fan5646_probe(struct platform_device *pdev)
+static int  fan5646_probe(struct platform_device *pdev)
 {
 	int rc;
 	struct fan5646_data *pdata;
@@ -887,7 +887,7 @@ static int __devinit fan5646_probe(struct platform_device *pdev)
 	return rc;
 }
 
-static int __devexit fan5646_remove(struct platform_device *pdev)
+static int  fan5646_remove(struct platform_device *pdev)
 {
 	struct fan5646_data *pdata = dev_get_drvdata(&pdev->dev);
 
@@ -907,7 +907,7 @@ static struct of_device_id fan5646_match_table[] = {
 
 static struct platform_driver fan5646_driver = {
 	.probe = fan5646_probe,
-	.remove = __devexit_p(fan5646_remove),
+	.remove = _p(fan5646_remove),
 	.driver = {
 		   .name = "leds-fan5646",
 		   .owner = THIS_MODULE,

@@ -832,7 +832,7 @@ err0:
 	return err;
 }
 
-static int __devexit l3g4200d_remove(struct i2c_client *client)
+static int  l3g4200d_remove(struct i2c_client *client)
 {
 	struct l3g4200d_data *gyro = i2c_get_clientdata(client);
 
@@ -871,7 +871,7 @@ static struct i2c_driver l3g4200d_driver = {
 		.of_match_table = of_match_ptr(l3g4200d_match_tbl),
 		   },
 	.probe = l3g4200d_probe,
-	.remove = __devexit_p(l3g4200d_remove),
+	.remove = _p(l3g4200d_remove),
 	.id_table = l3g4200d_id,
 };
 

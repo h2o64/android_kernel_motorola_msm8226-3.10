@@ -56,8 +56,7 @@ void ram_console_enable_console(int enabled)
 }
 
 #ifdef CONFIG_OF
-static struct ram_console_platform_data *__devinit
-ram_console_of_init(struct platform_device *pdev)
+static struct ram_console_platform_data ram_console_of_init(struct platform_device *pdev)
 {
 	struct ram_console_platform_data *pdata = NULL;
 	struct device_node *np = pdev->dev.of_node;
@@ -89,14 +88,13 @@ ram_console_of_init(struct platform_device *pdev)
 	return pdata;
 }
 #else
-static inline struct ram_console_platform_data *__devinit
-ram_console_of_init(struct platform_device *pdev)
+static inline struct ram_console_platform_data ram_console_of_init(struct platform_device *pdev)
 {
 	return NULL;
 }
 #endif
 
-static int __devinit ram_console_probe(struct platform_device *pdev)
+static int ram_console_probe(struct platform_device *pdev)
 {
 	struct ram_console_platform_data *pdata = pdev->dev.platform_data;
 	struct persistent_ram_zone *prz;

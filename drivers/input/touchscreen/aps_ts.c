@@ -1630,7 +1630,7 @@ static struct of_device_id aps_ts_match_table[] = {
 
 static struct i2c_driver aps_ts_driver = {
 	.probe		= aps_ts_probe,
-	.remove		= __devexit_p(aps_ts_remove),
+	.remove		= _p(aps_ts_remove),
 	.driver		= {
 		.name	= "aps_ts",
 		.of_match_table = of_match_ptr(aps_ts_match_table),

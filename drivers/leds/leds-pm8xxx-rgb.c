@@ -353,7 +353,7 @@ static struct attribute_group pm8xxx_rgb_attribute_group = {
 	.attrs = pm8xxx_rgb_led_attributes
 };
 
-static int __devinit create_pm8xxx_rgb_led(const struct led_pwm_gpio *led,
+static int  create_pm8xxx_rgb_led(const struct led_pwm_gpio *led,
 	struct pm8xxx_rgb_led_data *led_dat, struct device *parent)
 {
 	int ret, state;
@@ -452,7 +452,7 @@ static void delete_pm8xxx_rgb_led(struct pm8xxx_rgb_led_data *led)
 	pwm_free(led->pwm);
 }
 
-static int __devinit pm8xxx_rgb_led_probe(struct platform_device *pdev)
+static int  pm8xxx_rgb_led_probe(struct platform_device *pdev)
 {
 	struct led_pwm_gpio_platform_data *pdata = pdev->dev.platform_data;
 	struct pm8xxx_rgb_led_drv_data *drv_data;
@@ -513,7 +513,7 @@ err:
 	return ret;
 }
 
-static int __devexit pm8xxx_rgb_led_remove(struct platform_device *pdev)
+static int  pm8xxx_rgb_led_remove(struct platform_device *pdev)
 {
 	int i;
 	struct led_pwm_gpio_platform_data *pdata = pdev->dev.platform_data;
@@ -534,7 +534,7 @@ static int __devexit pm8xxx_rgb_led_remove(struct platform_device *pdev)
 
 static struct platform_driver pm8xxx_rgb_led_driver = {
 	.probe		= pm8xxx_rgb_led_probe,
-	.remove		= __devexit_p(pm8xxx_rgb_led_remove),
+	.remove		= _p(pm8xxx_rgb_led_remove),
 	.driver		= {
 		.name	= "pm8xxx_rgb_leds",
 		.owner	= THIS_MODULE,

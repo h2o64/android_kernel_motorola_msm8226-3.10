@@ -51,8 +51,8 @@ static int atmxt_resume(struct i2c_client *client);
 static void atmxt_early_suspend(struct early_suspend *handler);
 static void atmxt_late_resume(struct early_suspend *handler);
 #endif
-static int __devinit atmxt_init(void);
-static void __devexit atmxt_exit(void);
+static int atmxt_init(void);
+static void atmxt_exit(void);
 static void atmxt_free(struct atmxt_driver_data *dd);
 static void atmxt_free_ic_data(struct atmxt_driver_data *dd);
 static void atmxt_set_drv_state(struct atmxt_driver_data *dd,
@@ -143,7 +143,7 @@ static struct i2c_driver atmxt_driver = {
 		.of_match_table = of_match_ptr(atmxt_match_tbl),
 	},
 	.probe = atmxt_probe,
-	.remove = __devexit_p(atmxt_remove),
+	.remove = _p(atmxt_remove),
 	.id_table = atmxt_id,
 #ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend = atmxt_suspend,
@@ -572,12 +572,12 @@ static void atmxt_late_resume(struct early_suspend *handler)
 }
 #endif
 
-static int __devinit atmxt_init(void)
+static int atmxt_init(void)
 {
 	return i2c_add_driver(&atmxt_driver);
 }
 
-static void __devexit atmxt_exit(void)
+static void atmxt_exit(void)
 {
 	i2c_del_driver(&atmxt_driver);
 	return;

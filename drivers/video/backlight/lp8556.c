@@ -151,7 +151,7 @@ static void lp8556_flash_eeprom(struct lp8556_data *led_data)
 	}
 }
 
-static int __devinit lp8556_init_registers(struct lp8556_data *led_data)
+static int lp8556_init_registers(struct lp8556_data *led_data)
 {
 	uint8_t value = 0;
 	int error;
@@ -532,7 +532,7 @@ lp8556_of_init(struct i2c_client *client)
 }
 #endif
 
-static int __devinit lp8556_probe(struct i2c_client *client,
+static int lp8556_probe(struct i2c_client *client,
 				  const struct i2c_device_id *id)
 {
 	struct lp8556_platform_data *pdata;
@@ -670,7 +670,7 @@ err_alloc_data_failed:
 	return error;
 }
 
-static int __devexit lp8556_remove(struct i2c_client *client)
+static int lp8556_remove(struct i2c_client *client)
 {
 	struct lp8556_data *led_data = i2c_get_clientdata(client);
 
@@ -717,7 +717,7 @@ static struct i2c_driver lp8556_i2c_driver = {
 		.of_match_table = of_match_ptr(lp8556_match_tbl),
 	},
 	.probe = lp8556_probe,
-	.remove = __devexit_p(lp8556_remove),
+	.remove = _p(lp8556_remove),
 	.id_table = lp8556_id,
 	.address_list = normal_i2c
 };

@@ -123,7 +123,7 @@ static int c55_ctrl_gpio_setup(struct c55_ctrl_data *cdata, struct device *dev)
 	return 0;
 }
 
-static int __devinit c55_ctrl_probe(struct platform_device *pdev)
+static int  c55_ctrl_probe(struct platform_device *pdev)
 {
 	struct c55_ctrl_data *cdata;
 	int ret;
@@ -162,7 +162,7 @@ static int __devinit c55_ctrl_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int __devexit c55_ctrl_remove(struct platform_device *pdev)
+static int  c55_ctrl_remove(struct platform_device *pdev)
 {
 	return 0;
 }
@@ -186,7 +186,7 @@ static struct platform_driver c55_ctrl_driver = {
 		.of_match_table = c55_ctrl_match,
 	},
 	.probe = c55_ctrl_probe,
-	.remove = __devexit_p(c55_ctrl_remove),
+	.remove = _p(c55_ctrl_remove),
 	.id_table = c55_ctrl_id_table,
 };
 
