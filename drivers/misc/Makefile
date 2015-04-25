@@ -65,6 +65,7 @@ obj-$(CONFIG_QSEECOM) += qseecom.o
 ifdef CONFIG_COMPAT
 obj-$(CONFIG_QSEECOM) += compat_qseecom.o
 endif
+obj-$(CONFIG_SEC_DRIVER) += sec/
 obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
 obj-$(CONFIG_TI_DRV2667) += ti_drv2667.o
 obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
@@ -89,3 +90,10 @@ obj-$(CONFIG_SENSORS_BMG) += bmg160_driver.o bmg160.o
 obj-$(CONFIG_SENSORS_BMM050) += bmm050_driver.o bmm050.o
 obj-$(CONFIG_SENSORS_STML0XX) += stml0xx/
 obj-y				+= qcom/
+obj-$(CONFIG_ALSA_TO_H2W) += alsa-to-h2w-headset.o
+obj-$(CONFIG_MOT_UTAG) += utag/
+obj-$(CONFIG_MMI_FACTORY) += mmi-factory.o
+obj-$(CONFIG_DROPBOX) += dropbox.o
+obj-$(CONFIG_HOB_SHARED_RAM) += hob_ram_mmap.o
+obj-$(CONFIG_SENSORS_STML0XX) += stml0xx/
+obj-$(CONFIG_SENSORS_AK09912) += akm09912.o

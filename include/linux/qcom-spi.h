@@ -42,4 +42,6 @@ struct msm_spi_platform_data {
 	u32  bam_producer_pipe_index;
 	bool rt_priority;
 	bool use_pinctrl;
+	bool is_shared;
+	bool force_cs;
 };

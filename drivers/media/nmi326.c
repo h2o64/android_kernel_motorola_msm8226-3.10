@@ -63,11 +63,11 @@ struct nmi326_data {
 
 static struct nmi326_data *s_nmi326;
 
-static int nmi326_spi_read(struct spi_device *spi, u8 *buf, size_t len)
+static ssize_t nmi326_spi_read(struct spi_device *spi, u8 *buf, size_t len)
 {
 	struct spi_message msg;
 	struct spi_transfer transfer;
-	int rc;
+	ssize_t rc;
 
 	memset(&transfer, 0, sizeof(transfer));
 	spi_message_init(&msg);
@@ -87,11 +87,11 @@ static int nmi326_spi_read(struct spi_device *spi, u8 *buf, size_t len)
 	return len;
 }
 
-static int nmi326_spi_write(struct spi_device *spi, u8 *buf, size_t len)
+static ssize_t nmi326_spi_write(struct spi_device *spi, u8 *buf, size_t len)
 {
 	struct spi_message msg;
 	struct spi_transfer transfer;
-	int rc;
+	ssize_t rc;
 
 	memset(&transfer, 0, sizeof(transfer));
 	spi_message_init(&msg);
@@ -123,7 +123,7 @@ static unsigned long nmi326_spi_read_chip_id(struct spi_device *spi)
 	size_t len;
 	unsigned char sta = 0;
 	unsigned long val = 0;
-	int ret_size;
+	ssize_t ret_size;
 
 	b[0] = WORD_ACCESS;
 	b[1] = 0x00;
@@ -154,7 +154,7 @@ static unsigned long nmi326_spi_read_chip_id(struct spi_device *spi)
 
 			dev_notice(&spi->dev, "NMI326 Chip ID = 0x%lx\n", val);
 		} else
-			dev_err(&spi->dev, "NMI326 Error bad count %d\n", len);
+			dev_err(&spi->dev, "NMI326 Error bad count %zu\n", len);
 	} else
 		dev_err(&spi->dev, "NMI326 Error, SPI bus, not complete\n");
 
@@ -190,9 +190,9 @@ static int isdbt_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int isdbt_read(struct file *filp, char *buf, size_t count, loff_t *f_pos)
+static ssize_t isdbt_read(struct file *filp, char *buf, size_t count, loff_t *f_pos)
 {
-	int rc;
+	ssize_t rc;
 	struct nmi326_data *pdata = (struct nmi326_data *)(filp->private_data);
 
 	mutex_lock(&pdata->access_mutex);
@@ -206,11 +206,11 @@ static int isdbt_read(struct file *filp, char *buf, size_t count, loff_t *f_pos)
 	return rc;
 }
 
-static int isdbt_write(struct file *filp, const char *buf, size_t count,
+static ssize_t isdbt_write(struct file *filp, const char *buf, size_t count,
 		loff_t *f_pos)
 {
 	struct nmi326_data *pdata = (struct nmi326_data *)(filp->private_data);
-	int rc;
+	ssize_t rc;
 
 	mutex_lock(&pdata->access_mutex);
 
@@ -233,7 +233,7 @@ static long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case IOCTL_ISDBT_POWER_ON:
 		dev_dbg(&pdata->spi->dev, "IOCTL_ISDBT_POWER_ON\n");
 		if (pdata->regulator)
-			regulator_enable(pdata->regulator);
+			rc = regulator_enable(pdata->regulator);
 		if (gpio_is_valid(pdata->gpio_enable))
 			gpio_set_value(pdata->gpio_enable,
 				pdata->enable_active_high);
@@ -336,6 +336,9 @@ static const struct file_operations isdbt_fops = {
 	.read		= isdbt_read,
 	.write		= isdbt_write,
 	.unlocked_ioctl	= isdbt_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= isdbt_ioctl,
+#endif
 	.poll		= isdbt_poll,
 };
 
@@ -469,7 +472,7 @@ static int nmi326_probe(struct spi_device *spi)
 		pdata->regulator = NULL;
 		dev_warn(&spi->dev, "%s: isdbt_vdd not specified\n", __func__);
 	} else {
-		regulator_enable(pdata->regulator);
+		rc = regulator_enable(pdata->regulator);
 	}
 
 	pdata->gpio_ce = of_get_named_gpio(spi->dev.of_node, "ce-gpio", 0);
@@ -575,7 +578,7 @@ static struct spi_driver nmi326_spi_driver = {
 		.owner	= THIS_MODULE,
 	},
 	.probe = nmi326_probe,
-	.remove = __devexit_p(nmi326_remove),
+	.remove = nmi326_remove,
 };
 
 static int __init nmi326_init(void)

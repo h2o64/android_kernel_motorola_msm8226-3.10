@@ -2023,12 +2023,13 @@ int32_t qpnp_adc_tm_channel_measure(struct qpnp_adc_tm_chip *chip,
 				chip->sensor[dt_index].btm_channel_num;
 	chip->adc->amux_prop->chan_prop->state_request =
 					param->state_request;
+
 	for_each_child_of_node(node, child) {
 		rc = of_property_read_u32(child,
-				"qcom,meas-interval-timer-idx", &timer_select);
+		"qcom,meas-interval-timer-idx", &timer_select);
 		if (!rc && timer_select == ADC_MEAS_TIMER_SELECT1)
 			chip->sensor[dt_index].meas_interval =
-						param->timer_interval;
+			param->timer_interval;
 	}
 
 	rc = qpnp_adc_tm_configure(chip, chip->adc->amux_prop);

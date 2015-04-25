@@ -80,6 +80,7 @@ extern enum reboot_mode reboot_mode;
 extern void setup_dma_zone(const struct machine_desc *desc);
 void __attribute__((weak)) mach_cpuinfo_show(struct seq_file *m, void *v);
 
+
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
 unsigned int __machine_arch_type __read_mostly;

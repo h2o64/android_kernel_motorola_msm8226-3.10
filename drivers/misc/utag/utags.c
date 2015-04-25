@@ -29,6 +29,8 @@
 #include <linux/types.h>
 #include <linux/uaccess.h>
 #include <linux/unistd.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
 
 #define MAX_UTAG_SIZE 1024
 #define MAX_UTAG_NAME 32
@@ -270,12 +272,7 @@ utag_file(char *utag_name, char *utag_type,
 		strlcpy(node->type, utag_type, MAX_UTAG_NAME);
 		node->mode = mode;
 		node->dir = dir;
-		node->file = create_proc_entry(node->file_name, 0, dir);
-		if (node->file) {
-			node->file->proc_fops = fops;
-			node->file->data = (void *)node;
-		}
-
+		node->file = proc_create_data(node->file_name, 0, dir, fops, node);
 	}
 
 	return 0;
@@ -429,7 +426,7 @@ static void *freeze_tags(size_t block_size, const struct utag *tags,
 		goto out;
 	}
 
-	ptr = buf = kmalloc(frozen_size, GFP_KERNEL);
+	ptr = buf = vmalloc(frozen_size);
 	if (!buf) {
 		err = UTAG_ERR_OUT_OF_MEMORY;
 		goto out;
@@ -512,9 +509,9 @@ static struct utag *load_utags(const char *partition_name)
 
 	block_size = i_size_read(inode->i_bdev->bd_inode);
 
-	data = kmalloc(block_size, GFP_KERNEL);
+	data = vmalloc(block_size);
 	if (!data) {
-		pr_err("%s ERR file (%s) out of memory size %d\n", __func__,
+		pr_err("%s ERR file (%s) out of memory size %zu\n", __func__,
 		       partition_name, block_size);
 		goto close_block;
 	}
@@ -529,7 +526,7 @@ static struct utag *load_utags(const char *partition_name)
 	head = thaw_tags(block_size, data, NULL);
 
  free_data:
-	kfree(data);
+	vfree(data);
 
  close_block:
 	filp_close(filp, NULL);
@@ -606,11 +603,11 @@ flash_partition(const char *partition_name, const struct utag *tags)
 
 	written = filep->f_op->write(filep, datap, tags_size, &filep->f_pos);
 	if (written < tags_size) {
-		pr_err("%s ERROR writing file (%s) ret %d\n", __func__,
+		pr_err("%s ERROR writing file (%s) ret %zu\n", __func__,
 		       utags_blkdev, written);
 		status = UTAG_ERR_PARTITION_WRITE_ERR;
 	}
-	kfree(datap);
+	vfree(datap);
 
  close_block:
 	filp_close(filep, NULL);
@@ -685,14 +682,14 @@ write_utag(struct file *file, const char __user *buffer,
 	struct utag *tags = NULL;
 	enum utag_error status;
 	struct inode *inode = file->f_dentry->d_inode;
-	struct proc_node *proc = (struct proc_node *)PDE(inode)->data;
+	struct proc_node *proc = PDE_DATA(inode);
 
 	if (OUT_TYPE == proc->mode) {
 		return count;
 	}
 
 	if (MAX_UTAG_SIZE < count) {
-		pr_err("%s error utag too big %d\n", __func__, count);
+		pr_err("%s error utag too big %zu\n", __func__, count);
 		return count;
 	}
 
@@ -736,14 +733,14 @@ new_utag(struct file *file, const char __user *buffer,
 	struct utag *tags, *cur;
 	enum utag_error status;
 	struct inode *inode = file->f_dentry->d_inode;
-	struct proc_node *proc = (struct proc_node *)PDE(inode)->data;
+	struct proc_node *proc = PDE_DATA(inode);
 	char uname[MAX_UTAG_NAME];
 	char utype[MAX_UTAG_NAME];
 	struct dir_node *dnode;
 	struct proc_dir_entry *dir;
 
 	if ((MAX_UTAG_NAME < count) || (0 == count)) {
-		pr_err("%s invalid utag name %d\n", __func__, count);
+		pr_err("%s invalid utag name %zu\n", __func__, count);
 		return count;
 	}
 
@@ -869,17 +866,17 @@ out:
 
 static int config_read(struct inode *inode, struct file *file)
 {
-	return single_open(file, read_tag, PDE(inode)->data);
+	return single_open(file, read_tag, PDE_DATA(inode));
 }
 
 static int config_dump(struct inode *inode, struct file *file)
 {
-	return single_open(file, dump_all, PDE(inode)->data);
+	return single_open(file, dump_all, PDE_DATA(inode));
 }
 
 static int reload_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, reload_show, PDE(inode)->data);
+	return single_open(file, reload_show, PDE_DATA(inode));
 }
 
 static const struct file_operations utag_fops = {
@@ -1000,15 +997,16 @@ static int __init config_init(void)
 		return -EIO;
 	}
 
-	reload_pde = create_proc_entry("reload", 0600, dir_root);
+	reload_pde = proc_create("reload", 0600, dir_root, &reload_fops);
 	if (!reload_pde) {
 		pr_err("%s Failed to create reload entry\n", __func__);
 		remove_proc_entry("config", NULL);
 		return -EIO;
 	}
-	reload_pde->proc_fops = &reload_fops;
 
+#ifdef MODULE
 	build_utags_directory();
+#endif
 
 	return 0;
 }

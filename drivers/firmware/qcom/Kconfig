@@ -9,6 +9,7 @@ config MSM_TZ_LOG
 config MSM_TZ_LOG_WDOG_DUMP
 	bool "Dump TZ Log after watchdog reset"
 	depends on MSM_TZ_LOG
+	depends on PSTORE_RAM_ANNOTATION_APPEND
 	default n
 	help
 	  There are multiple kinds of fatal errors in TZ can trigger watchdog

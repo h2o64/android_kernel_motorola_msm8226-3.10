@@ -102,6 +102,7 @@ tune-$(CONFIG_CPU_V6)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
 tune-$(CONFIG_CPU_V6K)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
 tune-$(CONFIG_ARCH_MSM8226)	:=-mtune=cortex-a7
 tune-$(CONFIG_ARCH_MSM8610)	:=-mtune=cortex-a7
+tune-$(CONFIG_ARCH_MSM8916)	:=-mtune=cortex-a7
 
 ifeq ($(CONFIG_AEABI),y)
 CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork

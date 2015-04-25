@@ -31,12 +31,12 @@
 #include <soc/qcom/ramdump.h>
 #include <soc/qcom/smem.h>
 #include <soc/qcom/smsm.h>
-#include <asm/bootinfo.h>
 
 #include "peripheral-loader.h"
 #include "pil-q6v5.h"
 #include "pil-msa.h"
 #include "mmi-unit-info.h"
+#include <soc/qcom/bootinfo.h>
 
 #define MAX_VDD_MSS_UV		1150000
 #define PROXY_TIMEOUT_MS	10000
@@ -67,7 +67,7 @@ static void log_modem_sfr(void)
 		return;
 	}
 
-	strlcpy(pil_ssr_reason, smem_reason, min(size, MAX_SSR_REASON_LEN, sizeof(pil_ssr_reason)));
+	strlcpy(pil_ssr_reason, smem_reason, min((size_t)size, sizeof(pil_ssr_reason)));
 	pr_err("modem subsystem failure reason: %s.\n", pil_ssr_reason);
 
 	smem_reason[0] = '\0';

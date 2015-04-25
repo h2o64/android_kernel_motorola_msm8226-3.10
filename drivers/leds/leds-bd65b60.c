@@ -22,6 +22,7 @@
 #include <linux/uaccess.h>
 #include <linux/interrupt.h>
 #include <linux/regmap.h>
+#include <linux/pwm.h>
 #include <linux/platform_data/leds-bd65b60.h>
 #include <linux/of.h>
 
@@ -51,6 +52,7 @@
 struct bd65b60_chip {
 	struct bd65b60_platform_data *pdata;
 	struct regmap *regmap;
+	struct pwm_device *pwmd;
 	struct device *dev;
 	struct workqueue_struct *ledwq;
 	struct work_struct ledwork;
@@ -116,6 +118,18 @@ static int bd65b60_chip_init(struct i2c_client *client)
 	return rval;
 }
 
+static void bd65b60_pwm_ctrl(struct bd65b60_chip *pchip, int br)
+{
+	unsigned int period = pwm_get_period(pchip->pwmd);
+	unsigned int duty = br * period / BD65B60_MAX_BRIGHTNESS;
+
+	pwm_config(pchip->pwmd, duty, period);
+	if (duty)
+		pwm_enable(pchip->pwmd);
+	else
+		pwm_disable(pchip->pwmd);
+}
+
 /* set brightness */
 static void bd65b60_brightness_set(struct work_struct *work)
 {
@@ -138,10 +152,14 @@ static void bd65b60_brightness_set(struct work_struct *work)
 		dev_info(pchip->dev, "backlight off");
 	old_level = level;
 
-	bd65b60_write(pchip, REG_ILED, level);
-	if (!level)
-		/* turn off LED because 0 in REG_ILED = 1/256 * Imax */
-		bd65b60_write(pchip, REG_PON, 0x00);
+	if (pchip->pdata->pwm_period != 0)
+		bd65b60_pwm_ctrl(pchip, level);
+	else {
+		bd65b60_write(pchip, REG_ILED, level);
+		if (!level)
+			/* turn off LED because 0 in REG_ILED = 1/256 * Imax */
+			bd65b60_write(pchip, REG_PON, 0x00);
+	}
 
 	return;
 }
@@ -210,6 +228,9 @@ static int bd65b60_dt_init(struct i2c_client *client,
 	pdata->pwm_ctrl = (pdata->pwm_on)
 		? BD65B60_PWM_ENABLE : BD65B60_PWM_DISABLE;
 
+	pdata->pwm_period = BD65B60_DEFAULT_PWM_PERIOD;
+	of_property_read_u32(np, "rohm,pwm-period", &pdata->pwm_period);
+
 	return 0;
 
 }
@@ -274,6 +295,16 @@ static int bd65b60_probe(struct i2c_client *client,
 	if (rc < 0) {
 		dev_err(&client->dev, "fail : init chip");
 		return rc;
+	}
+
+	/* pwm */
+	if (pdata->pwm_period != 0) {
+		pchip->pwmd = devm_pwm_get(pchip->dev, "bd65b60-pwm");
+		if (IS_ERR(pchip->pwmd)) {
+			dev_err(&client->dev, "fail : get pwm device");
+			return PTR_ERR(pchip->pwmd);
+		}
+		pchip->pwmd->period = pdata->pwm_period;
 	}
 
 	/* led classdev register */

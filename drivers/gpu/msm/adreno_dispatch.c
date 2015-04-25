@@ -1246,17 +1246,15 @@ static inline const char *_kgsl_context_comm(struct kgsl_context *context)
 static char gpu_ft_report[GPU_FT_REPORT_LEN];
 static int gpu_ft_report_pos;
 #define pr_gpu_ft_report(fmt, args...) \
-		do { \
-			gpu_ft_report_pos += scnprintf( \
-			&gpu_ft_report[gpu_ft_report_pos], \
-			GPU_FT_REPORT_LEN - gpu_ft_report_pos, \
-			fmt, ##args); \
-		} while (0)
+		(gpu_ft_report_pos += scnprintf( \
+		&gpu_ft_report[gpu_ft_report_pos], \
+		GPU_FT_REPORT_LEN - gpu_ft_report_pos, \
+		fmt, ##args))
 
 #define pr_fault(_d, _c, fmt, args...) \
 		dev_err((_d)->dev, "%s[%d]: " fmt, \
 		_kgsl_context_comm((_c)->context), \
-		(_c)->context->proc_priv->pid, ##args)\
+		(_c)->context->proc_priv->pid, ##args); \
 		pr_gpu_ft_report(fmt, ##args)
 
 
@@ -1485,6 +1483,10 @@ void process_cmdbatch_fault(struct kgsl_device *device,
 
 	/* Invalidate the context */
 	adreno_drawctxt_invalidate(device, cmdbatch->context);
+
+	/* Log GPU FT report for failed recovery */
+	dropbox_queue_event_text("gpu_ft_report", gpu_ft_report,
+		gpu_ft_report_pos);
 }
 
 /**
@@ -1688,8 +1690,20 @@ static int dispatcher_do_fault(struct kgsl_device *device)
 
 	if (cmdbatch &&
 		!test_bit(KGSL_FT_SKIP_PMDUMP, &cmdbatch->fault_policy)) {
+		char *path;
+		char sys_path[256];
+
+		gpu_ft_report_pos = 0;
+		pr_gpu_ft_report("GPU FT: fault = %d\n%s[%d]\n", fault,
+			_kgsl_context_comm(cmdbatch->context),
+			cmdbatch->context->proc_priv->pid);
+
 		adreno_fault_header(device, cmdbatch);
 		kgsl_device_snapshot(device, cmdbatch->context);
+<<<<<<< HEAD
+=======
+
+>>>>>>> mmi : Add styxlte support
 		path = kobject_get_path(&device->snapshot_kobj, GFP_KERNEL);
 		snprintf(sys_path, sizeof(sys_path), "/sys%s/dump", path);
 		kfree(path);

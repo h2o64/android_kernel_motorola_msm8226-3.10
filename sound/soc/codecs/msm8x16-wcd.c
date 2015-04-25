@@ -2689,10 +2689,6 @@ static int msm8x16_wcd_codec_enable_dec(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec, tx_mux_ctl_reg, 0x30,
 					    CF_MIN_3DB_150HZ << 4);
 		}
-		snd_soc_update_bits(codec,
-				MSM8X16_WCD_A_ANALOG_TX_1_2_TXFE_CLKDIV,
-				0x51, 0x40);
-
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		/* enable HPF */
@@ -4031,6 +4027,7 @@ static int msm8x16_wcd_device_up(struct snd_soc_codec *codec)
 {
 	struct msm8x16_wcd_priv *msm8x16_wcd_priv =
 		snd_soc_codec_get_drvdata(codec);
+
 	u32 reg;
 	dev_dbg(codec->dev, "%s: device up!\n", __func__);
 
@@ -4070,6 +4067,7 @@ static int msm8x16_wcd_device_up(struct snd_soc_codec *codec)
 	wcd_mbhc_stop(&msm8x16_wcd_priv->mbhc);
 	wcd_mbhc_start(&msm8x16_wcd_priv->mbhc,
 			msm8x16_wcd_priv->mbhc.mbhc_cfg);
+#endif
 
 	mutex_unlock(&codec->mutex);
 
@@ -4290,8 +4288,10 @@ static int msm8x16_wcd_codec_probe(struct snd_soc_codec *codec)
 		return ret;
 	}
 
+#ifndef CONFIG_SND_SOC_FSA8500
 	wcd_mbhc_init(&msm8x16_wcd_priv->mbhc, codec, &mbhc_cb, &intr_ids,
 			true);
+#endif
 
 	msm8x16_wcd_priv->mclk_enabled = false;
 	msm8x16_wcd_priv->clock_active = false;

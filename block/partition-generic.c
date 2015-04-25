@@ -17,6 +17,7 @@
 #include <linux/ctype.h>
 #include <linux/genhd.h>
 #include <linux/blktrace_api.h>
+#include <linux/apanic_mmc.h>
 
 #include "partitions/check.h"
 
@@ -219,6 +220,7 @@ static void part_release(struct device *dev)
 static int part_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
 	struct hd_struct *part = dev_to_part(dev);
+	apanic_mmc_partition_add(part);
 
 	add_uevent_var(env, "PARTN=%u", part->partno);
 	if (part->info && part->info->volname[0])

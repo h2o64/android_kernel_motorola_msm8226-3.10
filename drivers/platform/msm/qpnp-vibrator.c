@@ -209,6 +209,7 @@ static void qpnp_vib_update(struct work_struct *work)
 {
 	struct qpnp_vib *vib = container_of(work, struct qpnp_vib,
 					 work);
+	qpnp_vibrator_config(vib);
 	qpnp_vib_set(vib, vib->state);
 }
 
@@ -298,6 +299,7 @@ static int qpnp_vib_parse_dt(struct qpnp_vib *vib)
 			"qcom,vib-boot-up-vibe-ms", &temp_val);
 	if (!rc)
 		vib->boot_up_vibe = temp_val;
+
 	if (vib->vtg_level < QPNP_VIB_MIN_LEVEL)
 		vib->vtg_level = QPNP_VIB_MIN_LEVEL;
 	else if (vib->vtg_level > QPNP_VIB_MAX_LEVEL)

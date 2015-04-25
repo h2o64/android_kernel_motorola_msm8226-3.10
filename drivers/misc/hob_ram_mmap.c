@@ -24,9 +24,11 @@
 #include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
-#include <mach/scm.h>
+#include <soc/qcom/scm.h>
+#include <soc/qcom/smem.h>
 
 #define HOB_RAM_MISC_DEV_NAME "mmi,hob_ram"
+#define DHOB_SIZE_MASK  0xFFFF
 
 struct hob_ram_misc_dev {
 	struct miscdevice mdev;
@@ -35,6 +37,11 @@ struct hob_ram_misc_dev {
 	int open_excl;
 	struct resource *shob;
 	struct resource *dhob;
+	unsigned char dynamic_smem;
+	unsigned int  shob_phys_page;
+	unsigned int  dhob_phys_page;
+	unsigned int  dhob_size;
+	unsigned int  shob_size;
 };
 
 struct hob_ram_misc_dev *hob_dev;
@@ -42,15 +49,13 @@ struct hob_ram_misc_dev *hob_dev;
 static int hob_valid_range(struct hob_ram_misc_dev *dev,
 			unsigned long pgoff, unsigned long vsize)
 {
-	unsigned long dhob_size;
-	unsigned long shob_size;
 
-	dhob_size = dev->dhob->end - dev->dhob->start + 1;
-	if ((dev->dhob->start >> PAGE_SHIFT) == pgoff && dhob_size == vsize)
+	if ((dev->dhob->start >> PAGE_SHIFT) == pgoff
+		&& hob_dev->dhob_size == vsize)
 		return 0;
 
-	shob_size = dev->shob->end - dev->shob->start + 1;
-	if ((dev->shob->start >> PAGE_SHIFT) == pgoff && shob_size == vsize)
+	if ((dev->shob->start >> PAGE_SHIFT) == pgoff
+		&& hob_dev->shob_size == vsize)
 		return 0;
 
 	return -EINVAL;
@@ -61,19 +66,49 @@ static int hob_shared_ram_mmap(struct file *fp, struct vm_area_struct *vma)
 	unsigned long vsize = vma->vm_end - vma->vm_start;
 	int ret;
 
-	/* Check if we are mapping the right HOB addresses */
-	if (hob_valid_range(hob_dev, vma->vm_pgoff, vsize)) {
-		dev_err(hob_dev->dev, "invalid address %lx and size %lx\n",
-			vma->vm_pgoff << PAGE_SHIFT, vsize);
-		return -EINVAL;
+	if (!hob_dev->dynamic_smem) {
+		/* Check if we are mapping the right HOB addresses */
+		if (hob_valid_range(hob_dev, vma->vm_pgoff, vsize)) {
+			dev_err(hob_dev->dev, "invalid address %lx and size %lx\n",
+				vma->vm_pgoff << PAGE_SHIFT, vsize);
+			return -EINVAL;
+		}
+	} else {
+		if ((vsize != hob_dev->shob_size) &&
+			(vsize != hob_dev->dhob_size)) {
+			dev_err(hob_dev->dev,
+				"invalid size 0x%lX, doesn't match modem SHOB or DHOB\n",
+				vsize);
+			return -EINVAL;
+		}
+
+		dev_dbg(hob_dev->dev, "Requested size 0x%lX\n", vsize);
+
+		if (vsize == hob_dev->shob_size) {
+			vma->vm_pgoff  = hob_dev->shob_phys_page;
+			dev_dbg(hob_dev->dev,
+				"SHOB io_remap set to page: 0x%0lX\n",
+				vma->vm_pgoff);
+		} else {
+			vma->vm_pgoff  = hob_dev->dhob_phys_page;
+			dev_dbg(hob_dev->dev,
+				"DHOB io_remap set to page: 0x%0lX\n",
+				vma->vm_pgoff);
+		}
 	}
 
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
 	ret = io_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 				 vsize, vma->vm_page_prot);
-	if (ret < 0)
+
+	if (ret < 0) {
 		dev_err(hob_dev->dev, "io_remap failed: %d\n", ret);
+	} else {
+		dev_info(hob_dev->dev,
+			"SHOB/DHOB VMA remapped: 0x%08lX 0x%08lX 0x%0lX\n",
+			vma->vm_start, vma->vm_end, vsize);
+	}
 
 	return ret;
 }
@@ -157,9 +192,12 @@ static int hob_ram_protect(struct hob_ram_misc_dev *hob_dev)
 	return ret;
 }
 
-static int __devinit hob_ram_probe(struct platform_device *pdev)
+static int hob_ram_probe(struct platform_device *pdev)
 {
 	int ret;
+	unsigned int smem_size;
+	void *shob_base_addr = 0;
+	unsigned int phys_addr;
 
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "no OF node supplied\n");
@@ -172,20 +210,80 @@ static int __devinit hob_ram_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	hob_dev->dhob = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!hob_dev->dhob) {
-		dev_err(&pdev->dev, "couldn't get DHOB memory range\n");
-		return -EINVAL;
-	}
+	hob_dev->dynamic_smem = of_property_read_bool(pdev->dev.of_node,
+						"mmi,allocation-type-smem");
+	dev_info(&pdev->dev, "allocation type: %s\n",
+			(hob_dev->dynamic_smem ? "smem" : "fixed"));
 
-	hob_dev->shob = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if (!hob_dev->shob) {
-		dev_err(&pdev->dev, "couldn't get SHOB memory range\n");
-		return -EINVAL;
-	}
+	if (hob_dev->dynamic_smem) {
+		/* Get HOB shared memory pointer */
+		shob_base_addr = smem_get_entry(
+					SMEM_HOB_RESERVE,
+					&smem_size,
+					0,
+					SMEM_ANY_HOST_FLAG);
+		dev_dbg(&pdev->dev,
+			"HOB region SMEM address 0x%p, size 0x%0X",
+			shob_base_addr, smem_size);
 
-	if (hob_ram_protect(hob_dev))
-		dev_err(&pdev->dev, "couldn't protect DHOB/SHOB memory range\n");
+		if (!shob_base_addr) {
+			dev_err(&pdev->dev, "modem: ERROR: HOB SMEM address NOT FOUND");
+			return -EINVAL;
+		} else if (IS_ERR(shob_base_addr)) {
+			dev_err(&pdev->dev, "smem returned errord\n");
+			return PTR_ERR(shob_base_addr);
+		}
+		/* reduce the size as it was increased
+			for alignment purpose */
+		smem_size -= (1 << PAGE_SHIFT);
+
+		phys_addr = smem_virt_to_phys(shob_base_addr);
+		dev_dbg(&pdev->dev,
+			"HOB physical SMEM address 0x%08X", phys_addr);
+		hob_dev->dhob_size = smem_size & DHOB_SIZE_MASK;
+		hob_dev->shob_size = smem_size - hob_dev->dhob_size;
+
+		/* allign the address by the page boundary */
+		hob_dev->shob_phys_page = (phys_addr >> PAGE_SHIFT) + 1;
+		hob_dev->dhob_phys_page = hob_dev->shob_phys_page
+			+ (hob_dev->shob_size >> PAGE_SHIFT);
+
+		dev_dbg(&pdev->dev,
+			"SHOB SMEM page offset: 0x%0X, size: 0x%0X\n",
+			hob_dev->shob_phys_page, hob_dev->shob_size);
+		dev_dbg(&pdev->dev,
+			"DHOB SMEM page offset: 0x%0X, size: 0x%0X\n",
+			hob_dev->dhob_phys_page, hob_dev->dhob_size);
+	} else {
+		hob_dev->shob = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+		if (!hob_dev->shob) {
+			dev_err(&pdev->dev, "couldn't get SHOB memory range\n");
+			return -EINVAL;
+		} else {
+			hob_dev->shob_size = hob_dev->shob->end
+				- hob_dev->shob->start + 1;
+			dev_dbg(&pdev->dev,
+				"SHOB resource addr 0x%0X, size 0x%0X",
+				(unsigned int)hob_dev->shob->start,
+				hob_dev->shob_size);
+		}
+
+		hob_dev->dhob = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+		if (!hob_dev->dhob) {
+			dev_err(&pdev->dev, "couldn't get DHOB memory range\n");
+			return -EINVAL;
+		} else {
+			hob_dev->dhob_size = hob_dev->dhob->end
+				- hob_dev->dhob->start + 1;
+			dev_dbg(&pdev->dev,
+				"DHOB resource addr 0x%0X, size 0x%0X",
+				(unsigned int)hob_dev->dhob->start,
+				hob_dev->dhob_size);
+		}
+
+		if (hob_ram_protect(hob_dev))
+			dev_err(&pdev->dev, "couldn't protect DHOB/SHOB memory range\n");
+	}
 
 	hob_dev->mdev.name = "mot_hob_ram";
 	hob_dev->mdev.minor = MISC_DYNAMIC_MINOR;
@@ -204,7 +302,7 @@ static int __devinit hob_ram_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int __devexit hob_ram_remove(struct platform_device *dev)
+static int hob_ram_remove(struct platform_device *dev)
 {
 	misc_deregister(&hob_dev->mdev);
 	mutex_destroy(&hob_dev->lock);
@@ -216,12 +314,14 @@ static struct of_device_id hob_ram_match_table[] = {
 	{ .compatible = HOB_RAM_MISC_DEV_NAME },
 	{ /* NULL */ },
 };
+#ifdef EXPORT_COMPAT
 EXPORT_COMPAT(HOB_RAM_MISC_DEV_NAME);
+#endif
 
 
 static struct platform_driver hob_driver = {
 	.probe = hob_ram_probe,
-	.remove = __devexit_p(hob_ram_remove),
+	.remove = hob_ram_remove,
 	.driver = {
 		.name = HOB_RAM_MISC_DEV_NAME,
 		.owner = THIS_MODULE,

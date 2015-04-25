@@ -304,6 +304,12 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		data->resolution = 12;
 		data->sample_time = HZ / 2;
 		break;
+	case tmp108:
+		set_mask = 0;
+		clr_mask = (1 << 2);		/* comparator mode */
+		data->resolution = 12;
+		data->sample_time = HZ;
+		break;
 	}
 
 	/* configure as specified */

@@ -28,6 +28,7 @@
 #include <soc/qcom/clock-local2.h>
 #include <mach/mmi_soc_info.h>
 #include <soc/qcom/clock-krait.h>
+#include <soc/qcom/mmi_soc_info.h>
 
 #include <asm/cputype.h>
 #include <dt-bindings/clock/msm-clocks-krait.h>

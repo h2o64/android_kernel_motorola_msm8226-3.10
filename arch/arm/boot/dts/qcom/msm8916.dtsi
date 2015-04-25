@@ -46,7 +46,7 @@
 		smd36 = &smdtty_loopback;
 
 		spi0 = &spi_0; /* SPI0 controller device */
-		i2c0 = &i2c_0; /* I2C0 controller device */
+		i2c2 = &i2c_2; /* I2C2 controller device */
 		i2c5 = &i2c_5; /* I2C5 controller device */
 		i2c6 = &i2c_6; /* I2C6 NFC qup6 device */
 		i2c4 = &i2c_4; /* I2C4 controller device */
@@ -620,7 +620,7 @@
 			 <&clock_gcc clk_gcc_sdcc1_apps_clk>;
 		clock-names = "iface_clk", "core_clk";
 
-		qcom,clk-rates = <400000 25000000 50000000 100000000 177770000>;
+		qcom,clk-rates = <400000 25000000 50000000 100000000 200000000>;
 		qcom,bus-speed-mode = "HS200_1p8v", "DDR_1p8v";
 
 		status = "disabled";
@@ -1393,7 +1393,7 @@
 		};
         };
 
-	i2c_0: i2c@78b6000 { /* BLSP1 QUP2 */
+	i2c_2: i2c@78b6000 { /* BLSP1 QUP2 */
 		compatible = "qcom,i2c-msm-v2";
 		#address-cells = <1>;
 		#size-cells = <0>;

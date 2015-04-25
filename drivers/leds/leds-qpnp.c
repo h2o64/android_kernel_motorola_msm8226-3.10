@@ -283,6 +283,7 @@ enum qpnp_leds {
 	QPNP_ID_KPDBL,
 	QPNP_ID_ATC,
 	QPNP_ID_LED_GPIO,
+	QPNP_ID_ATC,
 	QPNP_ID_MAX,
 };
 

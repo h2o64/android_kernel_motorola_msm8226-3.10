@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Motorola Mobility, LLC.
+ * Copyright (c) 2013-2014, Motorola Mobility, LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and

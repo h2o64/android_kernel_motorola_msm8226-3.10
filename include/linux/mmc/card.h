@@ -232,6 +232,7 @@ enum mmc_blk_status {
 	MMC_BLK_URGENT,
 	MMC_BLK_URGENT_DONE,
 	MMC_BLK_NO_REQ_TO_STOP,
+	MMC_BLK_BUS_ERR,
 };
 
 enum mmc_packed_stop_reasons {
@@ -490,6 +491,7 @@ struct mmc_fixup {
 #define CID_MANFID_TOSHIBA	0x11
 #define CID_MANFID_MICRON	0x13
 #define CID_MANFID_SAMSUNG	0x15
+#define CID_MANFID_SANDISK2	0x45
 #define CID_MANFID_KINGSTON	0x70
 #define CID_MANFID_SANDISK2	0x45
 #define CID_MANFID_HYNIX	0x90

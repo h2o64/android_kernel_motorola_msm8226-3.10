@@ -79,6 +79,26 @@ enum sensor_sub_module_t {
 	SUB_MODULE_MAX,
 };
 
+/* NOTE: Careful when adding params below,
+ * certain sensor drivers are doing one
+ * big copy for muliple params at one time
+ */
+struct mod_info_t {
+	uint8_t SensorSerialNum[13];
+	uint8_t MotPartNum[8];
+	uint8_t LensId[1];
+	uint8_t ManufactureId[2];
+	uint8_t FactoryId[2];
+	uint8_t ManufactureDate[9];
+	uint8_t ManufactureLine[2];
+	uint8_t ModuleSerialNum[4];
+	uint8_t FocuserLiftoff[2];
+	uint8_t FocuserMacro[2];
+	uint8_t FocuserInf[2];
+	uint8_t ShutterCal[16];
+	uint8_t SensorHwRev[5];
+};
+
 enum {
 	MSM_CAMERA_EFFECT_MODE_OFF,
 	MSM_CAMERA_EFFECT_MODE_MONO,
@@ -215,12 +235,18 @@ struct camera_vreg_t {
 	enum camera_vreg_type type;
 };
 
+struct var_fps_range_t {
+	uint16_t min_fps;
+	uint16_t max_fps;
+};
+
 struct sensorb_cfg_data {
 	int cfgtype;
 	union {
 		struct msm_sensor_info_t      sensor_info;
 		struct msm_sensor_init_params sensor_init_params;
 		void                         *setting;
+		struct otp_info_t             sensor_otp;
 	} cfg;
 };
 
@@ -400,6 +426,12 @@ enum msm_sensor_cfg_type_t {
 	CFG_SET_AUTOFOCUS,
 	CFG_CANCEL_AUTOFOCUS,
 	CFG_SET_STREAM_TYPE,
+	CFG_SET_FPS_RANGE,
+        CFG_SET_GAMMA,
+        CFG_SET_LENS_SHADING,
+        CFG_SET_TARGET_EXPOSURE,
+	CFG_GET_MODULE_INFO,
+	CFG_GET_LENS_SHADING,
 };
 
 enum msm_actuator_cfg_type_t {
@@ -411,6 +443,7 @@ enum msm_actuator_cfg_type_t {
 	CFG_ACTUATOR_POWERDOWN,
 	CFG_ACTUATOR_POWERUP,
 	CFG_ACTUATOR_INIT,
+	CFG_DIRECT_I2C_WRITE, /*to support non-trivial actuators*/
 };
 
 enum msm_ois_cfg_type_t {
@@ -531,6 +564,18 @@ struct msm_actuator_set_position_t {
 	uint16_t delay[MAX_NUMBER_OF_STEPS];
 };
 
+struct msm_actuator_i2c {
+	uint16_t addr;
+	uint16_t value;
+	uint32_t wait_time;
+};
+
+#define MSM_ACTUATOR_I2C_MAX_TABLE_SIZE (8)
+struct msm_actuator_i2c_table {
+	struct msm_actuator_i2c data[MSM_ACTUATOR_I2C_MAX_TABLE_SIZE];
+	uint32_t size;
+};
+
 struct msm_actuator_cfg_data {
 	int cfgtype;
 	uint8_t is_af_supported;
@@ -540,6 +585,7 @@ struct msm_actuator_cfg_data {
 		struct msm_actuator_get_info_t get_info;
 		struct msm_actuator_set_position_t setpos;
 		enum af_camera_name cam_name;
+		struct msm_actuator_i2c_table i2c_table;
 	} cfg;
 };
 
@@ -637,6 +683,13 @@ struct msm_camera_i2c_reg_setting32 {
 	uint16_t delay;
 };
 
+struct msm_camera_i2c_read_config32 {
+	uint16_t slave_addr;
+	uint16_t reg_addr;
+	enum msm_camera_i2c_data_type data_type;
+	compat_uptr_t data;
+};
+
 struct msm_actuator_tuning_params_t32 {
 	int16_t initial_code;
 	uint16_t pwd_step;
@@ -690,6 +743,7 @@ struct msm_actuator_cfg_data32 {
 		struct msm_actuator_get_info_t get_info;
 		struct msm_actuator_set_position_t setpos;
 		enum af_camera_name cam_name;
+		struct msm_actuator_i2c_table i2c_table;
 	} cfg;
 };
 
@@ -706,6 +760,7 @@ struct sensorb_cfg_data32 {
 	union {
 		struct msm_sensor_info_t      sensor_info;
 		struct msm_sensor_init_params sensor_init_params;
+		compat_int_t                  otp_info;
 		compat_uptr_t                 setting;
 	} cfg;
 };

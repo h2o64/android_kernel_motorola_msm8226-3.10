@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, Motorola Mobility LLC. All rights reserved.
+/* Copyright (c) 2014, Motorola Mobility LLC. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,9 +12,6 @@
 
 &mdss_mdp {
 	mot_dummy_vid_qhd: qcom,mdss_dsi_mot_dummy_qhd_video {
-		compatible = "qcom,mdss-dsi-panel";
-		status = "ok";
-
 		qcom,mdss-dsi-panel-name = "mipi_mot_video_dummy_qhd";
 		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
 		qcom,mdss-dsi-panel-type = "dsi_video_mode";
@@ -50,6 +47,7 @@
 		qcom,mdss-dsi-bllp-power-mode;
 		qcom,mdss-dsi-lane-0-state;
 		qcom,mdss-dsi-lane-1-state;
+		qcom,mdss-dsi-tx-eot-append;
 		qcom,mdss-dsi-panel-timings = [82 1c 12 00 40 42 16 1e 14 03 04 00];
 		qcom,mdss-dsi-t-clk-post = <0x04>;
 		qcom,mdss-dsi-t-clk-pre = <0x1b>;
@@ -57,9 +55,8 @@
 		qcom,mdss-dsi-bl-max-level = <255>;
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "none";
-		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
 
-		qcom,panel-en-reset-sequence = <1 0>;
-		qcom,panel-dis-reset-sequence = <0 0>;
+		qcom,mdss-dsi-reset-sequence = <1 0>;
 	};
 };
