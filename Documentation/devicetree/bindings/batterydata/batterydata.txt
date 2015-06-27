@@ -63,6 +63,12 @@ Profile data node optional properties:
 			battery thermistor. This should be exactly 6 bytes
 			in length.
 			Example: [01 02 03 04 05 06]
+- qcom,max-current-ma   : The maximum current of the battery
+- qcom,batt-id-sn       : The Serial number of the Battery Pack
+
+- qcom,battery-data node optional properties:
+- qcom,batt-id-limits   : If defined this will be used as a hard range limit on
+		        detecting this battery resistor.  The units are in uV.
 
 Profile data node required subnodes:
 - qcom,fcc-temp-lut : An 1-dimensional lookup table node that encodes
@@ -128,6 +134,7 @@ qcom,palladium-batterydata {
 	qcom,chg-term-ua = <100000>;
 	qcom,batt-id-kohm = <75>;
 	qcom,battery-type = "palladium_1500mah";
+	qcom,max-current-ma = <2600>;
 
 	qcom,fcc-temp-lut {
 		qcom,lut-col-legend = <(-20) 0 25 40 65>;
