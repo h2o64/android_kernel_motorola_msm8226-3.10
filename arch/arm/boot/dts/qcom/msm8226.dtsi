@@ -366,7 +366,6 @@
 		compatible = "qcom,android-usb";
 		reg = <0xfe8050c8 0xc8>;
 		qcom,pm-qos-latency = <2 1001 12701>;
-		qcom,streaming-func = "rndis";
 		qcom,android-usb-uicc-nluns = /bits/ 8 <1>;
 	};
 
@@ -744,9 +743,11 @@
 		reg = <0xf9017000 0x1000>;
 		reg-names = "wdt-base";
 		interrupts = <0 3 0>, <0 4 0>;
-		qcom,bark-time = <11000>;
+		qcom,bark-time = <22000>;
 		qcom,pet-time = <10000>;
 		qcom,ipi-ping;
+		qcom,memory-reservation-type = "EBI1";
+		qcom,memory-reservation-size = <0xb000>;
 	};
 
 	qcom,smem@fa00000 {
@@ -953,8 +954,27 @@
 		qcom,pmic-arb-channel = <0>;
 	};
 
-	i2c@f9925000 { /* BLSP-1 QUP-3 */
+	i2c_2: i2c@f9924000 { /* BLSP-1 QUP-2 */
 		cell-index = <2>;
+		compatible = "qcom,i2c-qup";
+		reg = <0xf9924000 0x1000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg-names = "qup_phys_addr";
+		interrupts = <0 96 0>;
+		interrupt-names = "qup_err_intr";
+		qcom,i2c-bus-freq = <100000>;
+		qcom,i2c-src-freq = <19200000>;
+		qcom,sda-gpio = <&msmgpio 6 0>;
+		qcom,scl-gpio = <&msmgpio 7 0>;
+		qcom,noise-rjct-scl = <1>;
+		qcom,noise-rjct-sda = <1>;
+		qcom,master-id = <86>;
+		status = "disabled";
+	};
+
+	i2c_3: i2c@f9925000 { /* BLSP-1 QUP-3 */
+		cell-index = <3>;
 		compatible = "qcom,i2c-qup";
 		reg = <0xf9925000 0x1000>;
 		#address-cells = <1>;
@@ -964,6 +984,7 @@
 		interrupt-names = "qup_err_intr";
 		qcom,i2c-bus-freq = <400000>;
 		qcom,i2c-src-freq = <19200000>;
+		status = "disabled";
 	};
 	i2c_0: i2c@f9926000 { /* BLSP-1 QUP-4 */
 		cell-index = <0>;
@@ -992,6 +1013,7 @@
 		qcom,i2c-src-freq = <19200000>;
 		qcom,sda-gpio = <&msmgpio 18 0>;
 		qcom,scl-gpio = <&msmgpio 19 0>;
+		qcom,master-id = <86>;
 	};
 
 	clock_gcc: qcom,gcc@fc400000 {
@@ -1281,7 +1303,7 @@
 		qcom,gpio-mosi = <&msmgpio 0 0>;
 		qcom,gpio-miso = <&msmgpio 1 0>;
 		qcom,gpio-clk  = <&msmgpio 3 0>;
-		qcom,gpio-cs0  = <&msmgpio 22 0>;
+		qcom,gpio-cs0  = <&msmgpio 2 0>;
 
 		qcom,infinite-mode = <0>;
 		qcom,use-bam;
@@ -1317,6 +1339,8 @@
 	qcom,tz-log@fe805720 {
 		compatible = "qcom,tz-log";
 		reg = <0x0fe805720 0x1000>;
+		qcom,memory-reservation-type = "EBI1";
+		qcom,memory-reservation-size = <0x1000>;
 	};
 
 	jtag_fuse: jtagfuse@fc4be024 {
@@ -1647,3 +1671,8 @@
 		status = "ok";
 	};
 };
+
+&pm8226_bms {
+	status = "ok";
+};
+
