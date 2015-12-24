@@ -116,9 +116,10 @@ void __init msm8226_init(void)
 	if (socinfo_init() < 0)
 		pr_err("%s: socinfo_init() failed\n", __func__);
 
-       /* Don't do hard-coded muxing for moto platform */
-       if (!platform_is_msm8226_moto())
-               msm8226_init_gpiomux();
+#ifndef defined(MMI_DEVICE_DTBS) || defined(ARCH_MSM8226)
+	/* Don't do hard-coded muxing for moto platform */
+	msm8226_init_gpiomux();
+#endif
 	msm8226_add_drivers();
 }
 
